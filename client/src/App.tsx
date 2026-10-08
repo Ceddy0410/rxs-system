@@ -13,6 +13,7 @@ import { DashboardView } from './components/DashboardView';
 import { PrinterMaintenance } from './components/PrinterMaintenance';
 import { UserManagementModal } from './components/UserManagementModal';
 import { ServerConnectionModal } from './components/ServerConnectionModal';
+import { CashDrawerModal } from './components/CashDrawerModal';
 import { apiFetch, getServerUrl } from './apiConfig';
 import type { MenuItem, CartItem, RawProduct, Order, User } from './types';
 import { FALLBACK_MENU, FALLBACK_PRODUCTS } from './initialData';
@@ -63,6 +64,7 @@ export const App: React.FC = () => {
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
   const [isServerModalOpen, setIsServerModalOpen] = useState<boolean>(false);
+  const [isCashDrawerModalOpen, setIsCashDrawerModalOpen] = useState<boolean>(false);
 
   // Audio Context Ref
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -813,6 +815,7 @@ export const App: React.FC = () => {
           isSocketConnected={isSocketConnected}
           lowStockIngredients={lowStockIngredients}
           onOpenServerModal={() => setIsServerModalOpen(true)}
+          onOpenCashDrawerModal={() => setIsCashDrawerModalOpen(true)}
         />
 
         {/* Tab Views */}
@@ -869,7 +872,11 @@ export const App: React.FC = () => {
           )}
 
           {currentTab === 'reports' && (
-            <ReportsViewer orders={orders} onRefresh={fetchData} />
+            <ReportsViewer
+              orders={orders}
+              onRefresh={fetchData}
+              onOpenCashDrawer={() => setIsCashDrawerModalOpen(true)}
+            />
           )}
 
           {currentTab === 'printer' && (
@@ -917,6 +924,14 @@ export const App: React.FC = () => {
           fetchData();
           window.location.reload();
         }}
+      />
+
+      {/* Cash Drawer Balancing & Shift Audit (X-Reading) Modal */}
+      <CashDrawerModal
+        isOpen={isCashDrawerModalOpen}
+        onClose={() => setIsCashDrawerModalOpen(false)}
+        currentUser={currentUser}
+        orders={orders}
       />
     </div>
   );

@@ -9,7 +9,8 @@ import {
   Wallet, 
   Receipt, 
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Banknote
 } from 'lucide-react';
 import type { Order } from '../types';
 import { ReceiptModal } from './ReceiptModal';
@@ -18,9 +19,10 @@ import { apiFetch } from '../apiConfig';
 interface ReportsViewerProps {
   orders?: Order[];
   onRefresh?: () => void;
+  onOpenCashDrawer?: () => void;
 }
 
-export const ReportsViewer: React.FC<ReportsViewerProps> = ({ orders = [], onRefresh }) => {
+export const ReportsViewer: React.FC<ReportsViewerProps> = ({ orders = [], onRefresh, onOpenCashDrawer }) => {
   // Period filter: 'today', 'monthly', 'annual', 'custom'
   const [periodType, setPeriodType] = useState<'today' | 'monthly' | 'annual' | 'custom'>('today');
   
@@ -260,6 +262,18 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ orders = [], onRef
             >
               <RefreshCw className="w-3.5 h-3.5 text-[#fed428]" />
               <span>Refresh</span>
+            </button>
+          )}
+
+          {onOpenCashDrawer && (
+            <button
+              type="button"
+              onClick={onOpenCashDrawer}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/80 text-xs font-black transition-all cursor-pointer touch-manipulation active:scale-95 shadow-lg shadow-emerald-950/30"
+              title="Audit and balance cash drawer against physical bills"
+            >
+              <Banknote className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Shift Cash Drawer Audit</span>
             </button>
           )}
 
