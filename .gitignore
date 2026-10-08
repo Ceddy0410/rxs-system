@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production builds & cache
+dist/
+client/dist/
+.output/
+.temp/
+
+# Android build outputs & gradle cache
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+client/android/capacitor-cordova-android-plugins/build/
+client/android/local.properties
+client/android/.idea/
+client/android/captures/
+*.iml
+
+# Large archive files & extracted binaries (>100MB exceeds GitHub limit)
+*.zip
+*.tar.gz
+extracted_fiddle/
+Fiddle_v3.4_Xiaomi.apk
+
+# Database runtime & logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+server/fiddledb.sqlite-wal
+server/fiddledb.sqlite-shm
+
+# macOS & iCloud conflict files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+* [0-9].*
+* [0-9][0-9].*
+
+# Environment
+.env
+.env.local
