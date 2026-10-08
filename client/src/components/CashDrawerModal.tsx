@@ -106,6 +106,19 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
       .reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
   }, [shiftOrders]);
 
+  // List of GCash orders in this shift
+  const gcashOrders = useMemo(() => {
+    return shiftOrders.filter((o) => (o.paymentMethod || '').toLowerCase() === 'gcash');
+  }, [shiftOrders]);
+
+  // Cashier Verified GCash from Phone / Merchant Slips
+  const [actualGCashVerified, setActualGCashVerified] = useState<string>('');
+  const hasEnteredGCash = actualGCashVerified.trim() !== '' && !isNaN(parseFloat(actualGCashVerified));
+  const verifiedGCashAmount = hasEnteredGCash ? parseFloat(actualGCashVerified) : 0;
+  const gcashDiscrepancy = hasEnteredGCash ? verifiedGCashAmount - totalGCashSales : 0;
+  const isGCashBalanced = hasEnteredGCash && Math.abs(gcashDiscrepancy) < 0.01;
+  const isGCashOver = hasEnteredGCash && gcashDiscrepancy > 0.01;
+
   // Expected physical cash that should be in the drawer
   const expectedCashInDrawer = startingFloat + totalCashSales;
 
@@ -162,6 +175,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
       coins: 0
     });
     setDirectCashCount('');
+    setActualGCashVerified('');
   };
 
   // Helper for 1-Click Verification / Test: Auto-fill breakdown to perfectly match expected
@@ -191,16 +205,21 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
       coins: Number(coins.toFixed(2))
     });
     setDirectCashCount(expectedCashInDrawer.toFixed(2));
+    setActualGCashVerified(totalGCashSales.toFixed(2));
   };
 
   const handlePrintShiftReconciliation = () => {
     const printWindow = window.open('', '', 'width=400,height=600');
     if (!printWindow) return;
 
+    const gcashPrintAmount = hasEnteredGCash ? verifiedGCashAmount : totalGCashSales;
+    const totalShiftGross = totalCashSales + gcashPrintAmount;
+    const netCashToDeposit = Math.max(0, actualCashCounted - startingFloat);
+
     const reportHtml = `
       <html>
         <head>
-          <title>Shift Cash Reconciliation - RXS POS</title>
+          <title>Shift Reconciliation - RXS POS</title>
           <style>
             body { font-family: monospace; font-size: 12px; padding: 10px; line-height: 1.4; color: #000; }
             .center { text-align: center; }
@@ -211,18 +230,18 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
         </head>
         <body>
           <div class="center bold">RXS RAMEN RESTAURANT</div>
-          <div class="center">CASH DRAWER RECONCILIATION AUDIT (X-READING)</div>
+          <div class="center">SHIFT & CASH RECONCILIATION AUDIT (X-READING)</div>
           <div class="center">${new Date().toLocaleString()}</div>
           <div class="divider"></div>
           <div class="row"><span>Audited Staff:</span><span class="bold">${currentUser.name}</span></div>
           <div class="row"><span>Shift Scope:</span><span class="bold">${cashierFilter === 'all' ? 'All Cashiers (Store Total)' : cashierFilter}</span></div>
           <div class="row"><span>Total Orders:</span><span>${shiftOrders.length}</span></div>
           <div class="divider"></div>
+          <div class="center bold">1. PHYSICAL CASH DRAWER AUDIT</div>
           <div class="row"><span>Starting Cash Float:</span><span>PHP ${startingFloat.toFixed(2)}</span></div>
-          <div class="row"><span>Cash Sales (Total):</span><span>PHP ${totalCashSales.toFixed(2)}</span></div>
-          <div class="row bold"><span>EXPECTED IN DRAWER:</span><span>PHP ${expectedCashInDrawer.toFixed(2)}</span></div>
+          <div class="row"><span>Shift Cash Sales:</span><span>PHP ${totalCashSales.toFixed(2)}</span></div>
+          <div class="row bold"><span>EXPECTED IN CASH DRAWER:</span><span>PHP ${expectedCashInDrawer.toFixed(2)}</span></div>
           <div class="divider"></div>
-          <div class="center bold">PHYSICAL CASH COUNTED:</div>
           <div class="row"><span>1000 Bills (${denominations.d1000}x):</span><span>PHP ${(denominations.d1000 * 1000).toFixed(2)}</span></div>
           <div class="row"><span>500 Bills (${denominations.d500}x):</span><span>PHP ${(denominations.d500 * 500).toFixed(2)}</span></div>
           <div class="row"><span>200 Bills (${denominations.d200}x):</span><span>PHP ${(denominations.d200 * 200).toFixed(2)}</span></div>
@@ -231,13 +250,26 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
           <div class="row"><span>20 Bills (${denominations.d20}x):</span><span>PHP ${(denominations.d20 * 20).toFixed(2)}</span></div>
           <div class="row"><span>Coins Total:</span><span>PHP ${(denominations.coins || 0).toFixed(2)}</span></div>
           <div class="divider"></div>
-          <div class="row bold"><span>ACTUAL COUNTED TOTAL:</span><span>PHP ${actualCashCounted.toFixed(2)}</span></div>
+          <div class="row bold"><span>ACTUAL CASH COUNTED:</span><span>PHP ${actualCashCounted.toFixed(2)}</span></div>
           <div class="row bold">
-            <span>VARIANCE / DISCREPANCY:</span>
+            <span>DRAWER CASH VARIANCE:</span>
             <span>${discrepancy >= 0 ? '+' : ''}PHP ${discrepancy.toFixed(2)} (${isBalanced ? 'BALANCED' : isOver ? 'OVERAGE' : 'SHORTAGE'})</span>
           </div>
           <div class="divider"></div>
-          <div class="row"><span>Separate GCash Total:</span><span>PHP ${totalGCashSales.toFixed(2)}</span></div>
+          <div class="center bold">2. GCASH & DIGITAL PAYMENTS AUDIT</div>
+          <div class="row"><span>System GCash Orders (${gcashOrders.length}):</span><span>PHP ${totalGCashSales.toFixed(2)}</span></div>
+          <div class="row"><span>Verified On Phone / Slips:</span><span>PHP ${gcashPrintAmount.toFixed(2)}</span></div>
+          <div class="row bold">
+            <span>GCASH VARIANCE:</span>
+            <span>${hasEnteredGCash ? `${gcashDiscrepancy >= 0 ? '+' : ''}PHP ${gcashDiscrepancy.toFixed(2)} (${isGCashBalanced ? 'BALANCED' : isGCashOver ? 'OVERAGE' : 'SHORTAGE'})` : 'VERIFIED MATCH'}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="center bold">3. COMBINED SHIFT SALES SUMMARY</div>
+          <div class="row"><span>Cash Sales Total:</span><span>PHP ${totalCashSales.toFixed(2)}</span></div>
+          <div class="row"><span>GCash Sales Total:</span><span>PHP ${gcashPrintAmount.toFixed(2)}</span></div>
+          <div class="row bold"><span>GROSS SHIFT REVENUE:</span><span>PHP ${totalShiftGross.toFixed(2)}</span></div>
+          <div class="row"><span>Net Cash for Bank Deposit:</span><span>PHP ${netCashToDeposit.toFixed(2)}</span></div>
+          <div class="row"><span>(Float PHP ${startingFloat.toFixed(2)} remains in drawer)</span></div>
           ${notes ? `<div class="divider"></div><div>Audit Notes: ${notes}</div>` : ''}
           <div class="divider"></div>
           <div class="center" style="margin-top: 20px;">Cashier Signature: __________________</div>
@@ -632,7 +664,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
             {/* Shift Audit Notes */}
             <div>
               <label className="text-[11px] font-bold text-gray-400 block mb-1">
-                Shift Audit Notes (Reason for discrepancy or petty cash adjustments):
+                Cash Drawer Audit Notes (Reason for discrepancy or petty cash adjustments):
               </label>
               <input
                 type="text"
@@ -641,6 +673,143 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full bg-[#0c0e11] border border-[#212833] rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#0ca1e1]"
               />
+            </div>
+          </div>
+
+          {/* GCash & Digital Payments Balancing Section */}
+          <div className="bg-[#151a21] border border-[#212833] rounded-2xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#212833]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#0ca1e1]/10 border border-[#0ca1e1]/30 flex items-center justify-center text-[#0ca1e1]">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-sm font-black text-white uppercase tracking-wider block">
+                    GCash & E-Wallet Reconciliation
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    Separate from physical cash drawer • Reconcile against merchant phone or GCash transaction history
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActualGCashVerified(totalGCashSales.toFixed(2))}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0ca1e1]/15 hover:bg-[#0ca1e1]/25 border border-[#0ca1e1]/40 text-[#0ca1e1] text-xs font-bold transition-all cursor-pointer active:scale-95"
+                  title="Auto-fill verified GCash to match system POS total"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Auto-Verify Match</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* Left: Expected from POS */}
+              <div className="bg-[#0c0e11] border border-[#212833] rounded-xl p-3.5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                    System GCash Orders Total
+                  </span>
+                  <div className="text-2xl font-black text-[#0ca1e1] font-mono">
+                    ₱{totalGCashSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-[11px] text-gray-400 mt-2">
+                  Total of <span className="font-bold text-white">{gcashOrders.length} orders</span> recorded as GCash in shift
+                </div>
+              </div>
+
+              {/* Right: Actual Verified by Cashier */}
+              <div className="bg-[#0c0e11] border border-[#212833] rounded-xl p-3.5 flex flex-col justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                    Cashier Verified Total (Phone / Slips)
+                  </span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-gray-500 font-mono">
+                      ₱
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={totalGCashSales > 0 ? totalGCashSales.toFixed(2) : "0.00"}
+                      value={actualGCashVerified}
+                      onChange={(e) => setActualGCashVerified(e.target.value)}
+                      className="w-full bg-[#151a21] border border-[#2b3543] rounded-xl pl-8 pr-3 py-1.5 text-xl font-black text-white font-mono focus:outline-none focus:border-[#0ca1e1]"
+                    />
+                  </div>
+                </div>
+                <div className="text-[10px] text-gray-500 mt-2">
+                  Enter sum of confirmation text messages or merchant app balance
+                </div>
+              </div>
+            </div>
+
+            {/* GCash Status Banner */}
+            {!hasEnteredGCash ? (
+              <div className="p-3.5 rounded-xl border border-[#2b3543] bg-[#121721] text-gray-300 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  <Smartphone className="w-4 h-4 text-[#0ca1e1] shrink-0" />
+                  <span>Awaiting cashier verification of GCash store phone / transaction slips.</span>
+                </div>
+                <span className="text-gray-400 font-bold font-mono">Pending Phone Audit</span>
+              </div>
+            ) : (
+              <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-bold ${
+                isGCashBalanced
+                  ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
+                  : isGCashOver
+                  ? 'bg-blue-950/40 border-blue-800 text-blue-300'
+                  : 'bg-rose-950/40 border-rose-800 text-rose-300'
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  {isGCashBalanced ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span>
+                    {isGCashBalanced
+                      ? '✅ GCash Payments 100% Balanced with Store Phone'
+                      : isGCashOver
+                      ? `💡 GCash Overage (+₱${gcashDiscrepancy.toFixed(2)} extra received on phone)`
+                      : `⚠️ GCash Shortage (-₱${Math.abs(gcashDiscrepancy).toFixed(2)} missing on phone)`}
+                  </span>
+                </div>
+                <span className="font-mono text-sm">
+                  {gcashDiscrepancy >= 0 ? `+₱${gcashDiscrepancy.toFixed(2)}` : `-₱${Math.abs(gcashDiscrepancy).toFixed(2)}`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Grand Total Combined Shift Summary */}
+          <div className="bg-gradient-to-r from-[#12161f] via-[#151b24] to-[#12161f] border border-[#2d3748] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+            <div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                Total Combined Shift Revenue (Cash + GCash)
+              </span>
+              <div className="text-2xl font-black text-white font-mono mt-0.5">
+                ₱{(totalCashSales + (hasEnteredGCash ? verifiedGCashAmount : totalGCashSales)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
+                <span>Cash: <strong className="text-emerald-400 font-mono">₱{totalCashSales.toFixed(2)}</strong></span>
+                <span>•</span>
+                <span>GCash: <strong className="text-[#0ca1e1] font-mono">₱{(hasEnteredGCash ? verifiedGCashAmount : totalGCashSales).toFixed(2)}</strong></span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="bg-[#0c0e11] px-4 py-2.5 rounded-xl border border-[#212833] text-right">
+                <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-wider">Net Cash to Bank / Safe</span>
+                <span className="text-base font-black text-[#fed428] font-mono">
+                  ₱{Math.max(0, actualCashCounted - startingFloat).toFixed(2)}
+                </span>
+                <span className="text-[9px] text-gray-500 block">Excludes ₱{startingFloat} starting float</span>
+              </div>
             </div>
           </div>
         </div>
