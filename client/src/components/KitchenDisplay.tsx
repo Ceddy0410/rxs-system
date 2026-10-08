@@ -43,16 +43,45 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
 
   const topPrepItems = Object.entries(itemPrepMap).sort((a, b) => b[1] - a[1]);
 
-  // Format Elapsed Time (e.g. "04:15")
-  const getElapsedTime = (createdAt: string) => {
-    const elapsedSeconds = Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 1000));
-    const mins = Math.floor(elapsedSeconds / 60);
-    const secs = elapsedSeconds % 60;
-    return {
-      formatted: `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
-      mins,
-      elapsedSeconds
-    };
+  // Robust Elapsed Time formatter (starts at 00:00, counts up cleanly)
+  const getElapsedTime = (createdAt?: string | null) => {
+    if (!createdAt) {
+      return { formatted: '00:00', mins: 0, elapsedSeconds: 0 };
+    }
+    try {
+      const normalized = typeof createdAt === 'string' && createdAt.includes(' ') && !createdAt.includes('T')
+        ? createdAt.replace(' ', 'T')
+        : createdAt;
+      const orderMs = new Date(normalized).getTime();
+      if (isNaN(orderMs)) {
+        return { formatted: '00:00', mins: 0, elapsedSeconds: 0 };
+      }
+      // Guarantee timer starts at 00:00 (never negative or skipping to 59s due to clock drift)
+      const elapsedSeconds = Math.max(0, Math.floor((now - orderMs) / 1000));
+      const mins = Math.floor(elapsedSeconds / 60);
+      const secs = elapsedSeconds % 60;
+      return {
+        formatted: `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
+        mins,
+        elapsedSeconds
+      };
+    } catch {
+      return { formatted: '00:00', mins: 0, elapsedSeconds: 0 };
+    }
+  };
+
+  const formatOrderTime = (createdAt?: string | null) => {
+    if (!createdAt) return '';
+    try {
+      const normalized = typeof createdAt === 'string' && createdAt.includes(' ') && !createdAt.includes('T')
+        ? createdAt.replace(' ', 'T')
+        : createdAt;
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   };
 
   return (
@@ -215,7 +244,7 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
                         <span>{timer.formatted}</span>
                       </div>
                       <span className="text-[10px] opacity-60 font-mono mt-0.5 block">
-                        {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatOrderTime(order.createdAt)}
                       </span>
                     </div>
                   </div>

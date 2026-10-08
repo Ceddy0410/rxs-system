@@ -26,7 +26,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
   currentUser,
   orders
 }) => {
-  // 1. Starting Float (Panimulang Barya)
+  // 1. Starting Float
   const [startingFloat, setStartingFloat] = useState<number>(() => {
     const saved = localStorage.getItem('rxs_cash_float');
     return saved ? parseFloat(saved) || 1000 : 1000;
@@ -224,11 +224,11 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
 
           {/* Top 3 Metric Cards: Float, Sales, Expected */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            {/* 1. Panimulang Barya (Float) */}
+            {/* 1. Starting Float */}
             <div className="bg-[#151a21] border border-[#212833] rounded-2xl p-4 flex flex-col justify-between">
               <div>
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                  1. Starting Float (Panimula)
+                  1. Starting Cash Float
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xl font-black text-white font-mono">₱</span>
@@ -243,7 +243,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
                 </div>
               </div>
               <span className="text-[10px] text-gray-500 mt-2 block">
-                Petty cash given for giving change (barya)
+                Petty cash provided for giving change
               </span>
             </div>
 
@@ -251,7 +251,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
             <div className="bg-[#151a21] border border-[#212833] rounded-2xl p-4 flex flex-col justify-between">
               <div>
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                  2. Total Cash Sales (System)
+                  2. Cash Sales (System Total)
                 </span>
                 <span className="text-2xl font-black text-emerald-400 font-mono">
                   ₱{totalCashSales.toFixed(2)}
@@ -259,7 +259,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-2">
                 <Smartphone className="w-3 h-3 text-[#0ca1e1]" />
-                <span>GCash (separate): ₱{totalGCashSales.toFixed(2)}</span>
+                <span>GCash / E-Wallet (Separate): ₱{totalGCashSales.toFixed(2)}</span>
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
                 </span>
               </div>
               <span className="text-[10px] text-gray-300 mt-2 block font-medium">
-                Panimula (₱{startingFloat}) + Cash Benta (₱{totalCashSales.toFixed(2)})
+                Starting Float (₱{startingFloat}) + Cash Sales (₱{totalCashSales.toFixed(2)})
               </span>
             </div>
           </div>
@@ -285,7 +285,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
               <div className="flex items-center gap-2">
                 <Calculator className="w-4 h-4 text-[#fed428]" />
                 <span className="text-sm font-black text-white uppercase tracking-wider">
-                  Cashier's Actual Drawer Count
+                  Cashier Actual Drawer Count
                 </span>
               </div>
 
@@ -417,7 +417,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
 
                 {/* Coins Total */}
                 <div className="bg-[#0c0e11] border border-[#212833] rounded-xl p-2.5 text-center">
-                  <span className="text-[11px] font-bold text-gray-400 block mb-1">All Coins (₱)</span>
+                  <span className="text-[11px] font-bold text-gray-400 block mb-1">Total Coins (₱)</span>
                   <input
                     type="number"
                     min="0"
@@ -428,7 +428,7 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
                     className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg text-center py-1 font-mono font-bold text-white text-sm focus:outline-none focus:border-[#fed428]"
                   />
                   <span className="text-[10px] text-gray-500 font-mono block mt-1">
-                    Coins sum
+                    Coins total
                   </span>
                 </div>
               </div>
@@ -474,8 +474,8 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
                     {isBalanced
                       ? '✅ Cash Drawer is Perfectly Balanced'
                       : isOver
-                      ? `⚠️ Overage Detected (+₱${discrepancy.toFixed(2)} Sobra)`
-                      : `⚠️ Shortage Detected (-₱${Math.abs(discrepancy).toFixed(2)} Kulang)`}
+                      ? `⚠️ Overage Detected (+₱${discrepancy.toFixed(2)} Over)`
+                      : `⚠️ Shortage Detected (-₱${Math.abs(discrepancy).toFixed(2)} Short)`}
                   </div>
                   <div className="text-xs opacity-90">
                     Actual Counted: <span className="font-mono font-bold">₱{actualCashCounted.toFixed(2)}</span> vs Expected: <span className="font-mono font-bold">₱{expectedCashInDrawer.toFixed(2)}</span>
@@ -495,10 +495,10 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
               </div>
             </div>
 
-            {/* Optional Notes */}
+            {/* Shift Audit Notes */}
             <div>
               <label className="text-[11px] font-bold text-gray-400 block mb-1">
-                Shift Audit Notes (Reason for discrepancy / petty cash adjustment):
+                Shift Audit Notes (Reason for discrepancy or petty cash adjustments):
               </label>
               <input
                 type="text"

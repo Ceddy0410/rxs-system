@@ -394,10 +394,17 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     const orders = await query('SELECT * FROM orders_tbl ORDER BY id DESC LIMIT 50');
-    const parsed = orders.map(o => ({
-      ...o,
-      items: typeof o.itemsJson === 'string' ? JSON.parse(o.itemsJson) : o.itemsJson
-    }));
+    const parsed = orders.map(o => {
+      let createdAt = o.createdAt;
+      if (typeof createdAt === 'string' && createdAt.includes(' ') && !createdAt.includes('T')) {
+        createdAt = createdAt.replace(' ', 'T');
+      }
+      return {
+        ...o,
+        createdAt,
+        items: typeof o.itemsJson === 'string' ? JSON.parse(o.itemsJson) : o.itemsJson
+      };
+    });
     res.json(parsed);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -421,13 +428,14 @@ app.post('/api/orders', async (req, res) => {
 
     const transactionId = String(Math.floor(1000000 + Math.random() * 9000000));
     const itemsJson = JSON.stringify(items);
+    const createdAt = new Date().toISOString();
 
     // 1. Insert order
     const result = await query(
       `INSERT INTO orders_tbl 
-      (transactionId, itemsJson, subtotal, discountType, discountAmount, totalAmount, paymentMethod, amountPaid, changeAmount, status, cashier)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?)`,
-      [transactionId, itemsJson, subtotal, discountType, discountAmount, totalAmount, paymentMethod, amountPaid, changeAmount, cashier]
+      (transactionId, itemsJson, subtotal, discountType, discountAmount, totalAmount, paymentMethod, amountPaid, changeAmount, status, cashier, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)`,
+      [transactionId, itemsJson, subtotal, discountType, discountAmount, totalAmount, paymentMethod, amountPaid, changeAmount, cashier, createdAt]
     );
 
     // 2. Decrement menu stock & auto-deduct raw ingredients from recipe

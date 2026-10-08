@@ -51,7 +51,6 @@ export const App: React.FC = () => {
     String(Math.floor(1000000 + Math.random() * 9000000))
   );
 
-  const [dbEngine, setDbEngine] = useState<string>('XAMPP MySQL');
   const [printerStatus, setPrinterStatus] = useState<{ connected: boolean; paperReady: boolean }>({
     connected: true,
     paperReady: true
@@ -149,7 +148,6 @@ export const App: React.FC = () => {
         setOrders(ordRes);
         localStorage.setItem('fiddle_orders', JSON.stringify(ordRes));
       }
-      if (statusRes.dbEngine) setDbEngine(statusRes.dbEngine);
       if (statusRes.printer) setPrinterStatus(statusRes.printer);
     } catch (err) {
       console.warn('Backend API offline - using internal offline tablet storage');
@@ -160,7 +158,6 @@ export const App: React.FC = () => {
       setMenuItems(cachedMenu ? JSON.parse(cachedMenu) : FALLBACK_MENU);
       setRawProducts(cachedProd ? JSON.parse(cachedProd) : FALLBACK_PRODUCTS);
       setOrders(cachedOrders ? JSON.parse(cachedOrders) : []);
-      setDbEngine('Tablet Offline Storage');
     }
   };
 
@@ -832,7 +829,6 @@ export const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Top Header */}
         <Header
-          dbEngine={dbEngine}
           printerStatus={printerStatus}
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}

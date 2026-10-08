@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Volume2, 
   VolumeX, 
-  Database, 
   Printer, 
   Clock, 
-  ArrowRightLeft,
   Shield, 
   UserCheck, 
-  ChefHat,
-  AlertTriangle,
-  Banknote
+  ChefHat, 
+  AlertTriangle, 
+  Banknote,
+  Bell,
+  X,
+  CheckCheck,
+  PackageCheck
 } from 'lucide-react';
 import type { User, RawProduct } from '../types';
 
 interface HeaderProps {
-  dbEngine: string;
   printerStatus: { connected: boolean; paperReady: boolean };
   soundEnabled: boolean;
   setSoundEnabled: (val: boolean) => void;
@@ -28,22 +29,35 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  dbEngine,
   printerStatus,
   soundEnabled,
   setSoundEnabled,
   currentUser,
-  onOpenUserModal,
   isSocketConnected = true,
   lowStockIngredients = [],
   onOpenServerModal,
   onOpenCashDrawerModal
 }) => {
   const [time, setTime] = useState(new Date());
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<string[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
 
+  // Real-time clock
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Close notification popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const formattedDate = time.toLocaleDateString('en-US', {
@@ -58,12 +72,48 @@ export const Header: React.FC<HeaderProps> = ({
     second: '2-digit'
   });
 
+  // Build active notifications list (low stock & expiring alerts)
+  const activeNotifications = useMemo(() => {
+    const alerts: Array<{
+      id: string;
+      title: string;
+      message: string;
+      type: 'low_stock' | 'restock' | 'expiry';
+      item: RawProduct;
+    }> = [];
+
+    lowStockIngredients.forEach((p) => {
+      alerts.push({
+        id: `low-${p.id}`,
+        title: `Low Stock: ${p.name}`,
+        message: `Only ${p.quantity} ${p.uom} left in stock (Min required: ${p.minStock} ${p.uom})`,
+        type: 'low_stock',
+        item: p
+      });
+    });
+
+    return alerts.filter((a) => !dismissedNotifIds.includes(a.id));
+  }, [lowStockIngredients, dismissedNotifIds]);
+
+  // Max number indicator is 99 (if exceeded, show 99)
+  const rawCount = activeNotifications.length;
+  const displayBadgeCount = rawCount > 99 ? '99' : String(rawCount);
+
+  const handleDismissNotif = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissedNotifIds((prev) => [...prev, id]);
+  };
+
+  const handleClearAllNotifs = () => {
+    setDismissedNotifIds(activeNotifications.map((n) => n.id));
+  };
+
   return (
-    <header className="h-16 bg-[#0f1217] border-b border-[#212833] px-5 flex items-center justify-between select-none">
-      {/* Left: Active Staff & Real-Time Sync Indicator */}
+    <header className="h-16 bg-[#0f1217] border-b border-[#212833] px-5 flex items-center justify-between select-none font-sans">
+      {/* Left: Active Staff, Drawer Audit & Real-Time Sync Indicator */}
       <div className="flex items-center gap-3">
-        {/* Active Cashier / Staff Badge with 1-Click Switch Button */}
-        <div className="flex items-center gap-2 bg-[#151a21] p-1.5 pr-2.5 rounded-2xl border border-[#212833] shadow-inner">
+        {/* Active Cashier / Staff Badge */}
+        <div className="flex items-center gap-2 bg-[#151a21] p-1.5 pr-3 rounded-2xl border border-[#212833] shadow-inner">
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
             currentUser.role === 'Admin' ? 'bg-[#fed428]/20 text-[#fed428]' :
             currentUser.role === 'Cashier' ? 'bg-[#0ca1e1]/20 text-[#0ca1e1]' :
@@ -96,27 +146,16 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {onOpenUserModal && (
-            <button
-              type="button"
-              onClick={onOpenUserModal}
-              className="ml-2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0c0e11] hover:bg-[#202733] border border-[#212833] text-gray-300 hover:text-white text-[11px] font-bold transition-all cursor-pointer touch-manipulation active:scale-95"
-              title="Switch Cashier or Manage Staff Accounts"
-            >
-              <ArrowRightLeft className="w-3 h-3 text-[#fed428]" />
-              <span className="hidden sm:inline">Switch Acc</span>
-            </button>
-          )}
-
+          {/* Drawer Audit Action Button */}
           {onOpenCashDrawerModal && currentUser.role !== 'Kitchen' && (
             <button
               type="button"
               onClick={onOpenCashDrawerModal}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0c0e11] hover:bg-emerald-950/60 border border-[#212833] hover:border-emerald-700/60 text-emerald-400 text-[11px] font-bold transition-all cursor-pointer touch-manipulation active:scale-95"
+              className="ml-2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0c0e11] hover:bg-emerald-950/60 border border-[#212833] hover:border-emerald-700/60 text-emerald-400 text-[11px] font-bold transition-all cursor-pointer touch-manipulation active:scale-95"
               title="Cash Drawer Balancing & Shift Audit (X-Reading)"
             >
               <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden md:inline">Drawer Audit</span>
+              <span>Drawer Audit</span>
             </button>
           )}
         </div>
@@ -137,56 +176,111 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Status Controls */}
+      {/* Right: Notification Bell, Clock, Printer & Audio Controls */}
       <div className="flex items-center gap-3">
-        {/* Low Stock Raw Ingredients Alert */}
-        {lowStockIngredients.length > 0 && (
-          <div className="relative group">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[11px] font-bold font-mono animate-pulse hover:animate-none cursor-pointer shadow-md shadow-amber-500/10">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              <span>{lowStockIngredients.length} LOW INGREDIENT{lowStockIngredients.length > 1 ? 'S' : ''}</span>
-            </div>
+        {/* Sleek Notification Bell with Badge & Dropdown */}
+        <div className="relative" ref={notifRef}>
+          <button
+            type="button"
+            onClick={() => setIsNotifOpen((prev) => !prev)}
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all border cursor-pointer active:scale-95 ${
+              rawCount > 0
+                ? 'bg-[#151a21] border-[#2b3543] text-amber-400 hover:text-amber-300 shadow-md'
+                : 'bg-[#151a21] border-[#212833] text-gray-400 hover:text-white'
+            }`}
+            title="System & Inventory Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {rawCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 border-2 border-[#0f1217] text-white text-[10px] font-black font-mono flex items-center justify-center shadow-lg animate-pulse">
+                {displayBadgeCount}
+              </span>
+            )}
+          </button>
 
-            {/* Hover Tooltip / Dropdown */}
-            <div className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 bg-[#151a21] border border-[#2b3543] rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in zoom-in duration-100">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#212833]">
-                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertTriangle className="w-3 h-3" />
-                  Low Stock Ingredients
-                </span>
-                <span className="text-[10px] text-gray-400 font-mono">
-                  {lowStockIngredients.length} item{lowStockIngredients.length > 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {lowStockIngredients.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-[#0c0e11] border border-[#212833] text-xs">
-                    <div>
-                      <div className="font-bold text-white">{p.name}</div>
-                      <div className="text-[10px] text-gray-500">Min: {p.minStock} {p.uom}</div>
-                    </div>
-                    <span className="text-amber-400 font-mono font-bold">
-                      {p.quantity} {p.uom}
+          {/* Notifications Dropdown Modal Box */}
+          {isNotifOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-[#151a21] border border-[#2b3543] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+              {/* Dropdown Header */}
+              <div className="px-4 py-3 border-b border-[#212833] flex items-center justify-between bg-[#0f1217]">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-[#fed428]" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    Notifications
+                  </span>
+                  {rawCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold font-mono">
+                      {rawCount} new
                     </span>
+                  )}
+                </div>
+
+                {rawCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllNotifs}
+                    className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    title="Mark all as read"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Clear All</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Notification List Body */}
+              <div className="max-h-80 overflow-y-auto divide-y divide-[#212833]/60 p-1">
+                {activeNotifications.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500 space-y-1">
+                    <PackageCheck className="w-8 h-8 mx-auto text-gray-600 mb-2" />
+                    <p className="text-xs font-bold text-gray-400">All caught up!</p>
+                    <p className="text-[11px] text-gray-600">No low ingredients or alerts at this time.</p>
                   </div>
-                ))}
+                ) : (
+                  activeNotifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className="p-3 hover:bg-[#1a212c] transition-colors flex items-start justify-between gap-3 group rounded-xl"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-white leading-tight">
+                            {notif.title}
+                          </h4>
+                          <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                            {notif.message}
+                          </p>
+                          <span className="text-[10px] font-mono text-amber-400/90 font-semibold mt-1 inline-block">
+                            Min: {notif.item.minStock} {notif.item.uom}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Click to dismiss item */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDismissNotif(notif.id, e)}
+                        className="text-gray-500 hover:text-gray-300 p-1 rounded-lg hover:bg-[#202733] transition-all cursor-pointer opacity-80 group-hover:opacity-100"
+                        title="Dismiss notification"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Real-time Clock */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#151a21] border border-[#212833] text-gray-300 text-xs font-mono">
           <Clock className="w-3.5 h-3.5 text-amber-400" />
           <span className="hidden md:inline">{formattedDate}</span>
           <span className="text-[#fed428] font-bold">{formattedTime}</span>
-        </div>
-
-        {/* Database Status */}
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] border border-[#212833] text-xs">
-          <Database className="w-3.5 h-3.5 text-[#0ca1e1]" />
-          <span className="text-gray-400">DB:</span>
-          <span className="font-semibold text-emerald-400">{dbEngine || 'MySQL'}</span>
         </div>
 
         {/* Printer Status */}
