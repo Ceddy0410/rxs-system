@@ -140,10 +140,10 @@ Change        :              PHP     155.00
                 Thermal Paper Roll
               </span>
               <span className="text-xl font-black">
-                {printerStatus.paperReady ? 'PAPER READY (80mm)' : 'PAPER OUT / COVER OPEN'}
+                {printerStatus.paperReady ? 'PAPER READY (58mm)' : 'PAPER OUT / COVER OPEN'}
               </span>
               <p className="text-[11px] opacity-75 mt-0.5">
-                {printerStatus.paperReady ? 'Standard 80mm roll detected' : 'Please insert new thermal paper roll'}
+                {printerStatus.paperReady ? 'Standard 58mm mini roll detected' : 'Please insert new 58mm thermal roll'}
               </p>
             </div>
             {printerStatus.paperReady ? (
@@ -159,10 +159,10 @@ Change        :              PHP     155.00
               Printer Driver Engine
             </span>
             <span className="text-xl font-black text-white font-mono">
-              ESC/POS Direct Engine
+              ESC/POS 58mm Mini Engine
             </span>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              Zero driver dependency • Epson/Xprinter/Star
+              32-Column Mini Standard • POS-58 / Bluetooth / USB
             </p>
           </div>
         </div>

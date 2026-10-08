@@ -221,10 +221,20 @@ export const CashDrawerModal: React.FC<CashDrawerModalProps> = ({
         <head>
           <title>Shift Reconciliation - RXS POS</title>
           <style>
-            body { font-family: monospace; font-size: 12px; padding: 10px; line-height: 1.4; color: #000; }
+            @page { size: 58mm auto; margin: 0; }
+            body { 
+              font-family: monospace, 'Courier New', Courier; 
+              font-size: 11px; 
+              width: 54mm; 
+              max-width: 58mm; 
+              padding: 4px; 
+              margin: 0 auto; 
+              line-height: 1.3; 
+              color: #000; 
+            }
             .center { text-align: center; }
             .bold { font-weight: bold; }
-            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .divider { border-top: 1px dashed #000; margin: 6px 0; }
             .row { display: flex; justify-content: space-between; }
           </style>
         </head>

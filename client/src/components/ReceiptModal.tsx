@@ -29,30 +29,39 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ order, onClose }) =>
           </button>
         </div>
 
-        {/* Thermal Receipt Visual Preview (80mm width standard) */}
-        <div className="flex-1 overflow-y-auto my-4 p-4 bg-white text-black font-mono text-xs rounded-xl shadow-inner border border-gray-300">
-          <div id="thermal-receipt" className="space-y-1.5 leading-tight">
+        {/* Thermal Receipt Visual Preview (58mm Mini Printer Width) */}
+        <div className="flex items-center justify-between mt-3 px-1">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            Receipt Preview
+          </span>
+          <span className="text-[10px] font-bold text-[#fed428] bg-[#fed428]/10 border border-[#fed428]/30 px-2 py-0.5 rounded-md font-mono">
+            58mm Mini Printer
+          </span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto my-2 p-3 bg-white text-black font-mono text-xs rounded-xl shadow-inner border border-gray-300 max-w-[320px] mx-auto w-full">
+          <div id="thermal-receipt" className="space-y-1.5 leading-tight text-[11px]">
             <div className="flex flex-col items-center justify-center text-center pb-1">
               <img
                 src="/images/rxs_logo.png"
                 alt="RXS Restaurant Logo"
-                className="w-16 h-16 object-contain mb-1"
+                className="w-14 h-14 object-contain mb-1"
               />
-              <div className="font-black text-sm tracking-widest uppercase">
+              <div className="font-black text-sm tracking-wider uppercase">
                 RXS RESTAURANT
               </div>
-              <div className="text-[11px] font-semibold text-gray-700">
+              <div className="text-[10px] font-semibold text-gray-700">
                 Authentic Dining & Specialties
               </div>
               <div className="text-[10px] text-gray-600">
                 Tel: 0912-345-6789
               </div>
               <div className="text-gray-400 font-normal">
-                ================================
+                --------------------------------
               </div>
             </div>
 
-            <div className="text-[11px] pt-1">
+            <div className="text-[10px] pt-0.5 space-y-0.5">
               <div>Date : {new Date(order.createdAt).toLocaleString()}</div>
               <div>OR # : {order.transactionId}</div>
               <div>Staff: {order.cashier}</div>
