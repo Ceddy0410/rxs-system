@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UtensilsCrossed, Clock, CheckCircle, ChefHat, Volume2, AlertTriangle, Flame, Tv } from 'lucide-react';
+import { UtensilsCrossed, Clock, CheckCircle, ChefHat, Volume2, AlertTriangle, Flame, X } from 'lucide-react';
 import type { Order } from '../types';
 
 interface KitchenDisplayProps {
@@ -7,7 +7,7 @@ interface KitchenDisplayProps {
   onUpdateOrderStatus: (orderId: number, status: 'Preparing' | 'Ready' | 'Completed') => void;
   onPlayChime?: () => void;
   isTvMode?: boolean;
-  onToggleTvMode?: () => void;
+  onExitTvMode?: () => void;
 }
 
 export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({ 
@@ -15,7 +15,7 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
   onUpdateOrderStatus,
   onPlayChime,
   isTvMode = false,
-  onToggleTvMode
+  onExitTvMode
 }) => {
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Preparing' | 'Ready'>('All');
   const [now, setNow] = useState<number>(Date.now());
@@ -97,43 +97,27 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
             <ChefHat className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-black text-white tracking-wide">
-                Kitchen Display System (KDS)
-              </h2>
-              {isTvMode ? (
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold flex items-center gap-1.5 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  TV SCREEN ACTIVE
-                </span>
-              ) : (
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 font-mono font-bold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-                  LIVE KITCHEN FEED
-                </span>
-              )}
-            </div>
+            <h2 className="text-xl font-black text-white tracking-wide">
+              Kitchen Display System (KDS)
+            </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               Instant real-time ticket stream from Cashier terminals
             </p>
           </div>
         </div>
 
-        {/* Filter Pills & Actions (All in single row, no floating overlaps) */}
+        {/* Filter Pills & Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {onToggleTvMode && (
+          {/* Only show Exit TV Mode when in fullscreen TV mode */}
+          {isTvMode && onExitTvMode && (
             <button
               type="button"
-              onClick={onToggleTvMode}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer ${
-                isTvMode
-                  ? 'bg-[#151a21] hover:bg-rose-950/50 border-[#2b3543] hover:border-rose-700/60 text-gray-300 hover:text-rose-300'
-                  : 'bg-[#151a21] hover:bg-[#202733] border-[#2b3543] text-gray-300 hover:text-white'
-              }`}
-              title={isTvMode ? 'Exit Fullscreen TV Mode' : 'Switch to Dedicated TV Screen View'}
+              onClick={onExitTvMode}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] hover:bg-rose-950/50 border border-[#2b3543] hover:border-rose-700/60 text-gray-300 hover:text-rose-300 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+              title="Exit Fullscreen TV Mode"
             >
-              <Tv className="w-3.5 h-3.5 text-amber-400" />
-              <span>{isTvMode ? 'Exit TV Mode' : 'TV Screen View'}</span>
+              <X className="w-3.5 h-3.5 text-rose-400" />
+              <span>Exit TV Mode</span>
             </button>
           )}
 

@@ -789,7 +789,7 @@ export const App: React.FC = () => {
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onPlayChime={playKitchenChime}
           isTvMode={true}
-          onToggleTvMode={() => setTvMode(false)}
+          onExitTvMode={() => setTvMode(false)}
         />
       </div>
     );
@@ -853,8 +853,6 @@ export const App: React.FC = () => {
               orders={orders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onPlayChime={playKitchenChime}
-              isTvMode={false}
-              onToggleTvMode={() => setTvMode(true)}
             />
           )}
 
