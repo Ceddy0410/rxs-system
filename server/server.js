@@ -506,8 +506,8 @@ app.patch('/api/orders/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    await query('UPDATE orders_tbl SET status = ? WHERE id = ?', [status, id]);
-    io.emit('order:status', { id: Number(id), status });
+    await query('UPDATE orders_tbl SET status = ? WHERE id = ? OR transactionId = ?', [status, id, id]);
+    io.emit('order:status', { id: Number(id), transactionId: String(id), status });
 
     res.json({ success: true, id, status });
   } catch (err) {
@@ -609,6 +609,7 @@ server.listen(PORT, '0.0.0.0', () => {
 
 // Also create fallback listener on port 3000 for maximum compatibility
 const server3000 = http.createServer(app);
+io.attach(server3000);
 server3000.listen(3000, '0.0.0.0', () => {
-  console.log(`🚀 [Secondary Port 3000] Running on http://0.0.0.0:3000`);
+  console.log(`🚀 [Secondary Port 3000 & WebSockets] Running on http://0.0.0.0:3000`);
 });

@@ -196,15 +196,31 @@ export const App: React.FC = () => {
 
     // Real-time Event 2: New order punched by cashier -> Kitchen chimes, Admin updates
     socket.on('order:new', (newOrder: Order) => {
-      setOrders((prev) => [newOrder, ...prev]);
+      setOrders((prev) => {
+        const exists = prev.some(
+          (o) => (o.id && o.id === newOrder.id) || (o.transactionId && o.transactionId === newOrder.transactionId)
+        );
+        if (exists) return prev;
+        const next = [newOrder, ...prev];
+        try { localStorage.setItem('fiddle_orders', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
       playKitchenChime(); // Audibly notify kitchen station
     });
 
     // Real-time Event 3: Kitchen updates status -> Cashier and Admin see progress live
-    socket.on('order:status', ({ id, status }) => {
-      setOrders((prev) =>
-        prev.map((ord) => (ord.id === id ? { ...ord, status } : ord))
-      );
+    socket.on('order:status', ({ id, status, transactionId }: any) => {
+      setOrders((prev) => {
+        const updated = prev.map((ord) => {
+          const isMatch =
+            (id && ord.id === id) ||
+            (id && String(ord.transactionId) === String(id)) ||
+            (transactionId && String(ord.transactionId) === String(transactionId));
+          return isMatch ? { ...ord, status } : ord;
+        });
+        try { localStorage.setItem('fiddle_orders', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
       playBeep(950, 'sine', 0.06);
     });
 
@@ -355,8 +371,18 @@ export const App: React.FC = () => {
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.order) {
         playBeep(1100, 'sine', 0.2);
+        setOrders((prev) => {
+          const exists = prev.some(
+            (o) => (o.id && o.id === data.order.id) || (o.transactionId && o.transactionId === data.order.transactionId)
+          );
+          const next = exists
+            ? prev.map((o) => (o.transactionId === data.order.transactionId ? data.order : o))
+            : [data.order, ...prev];
+          try { localStorage.setItem('fiddle_orders', JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
         setCompletedOrder(data.order);
         setIsPaymentOpen(false);
         setCart([]);
