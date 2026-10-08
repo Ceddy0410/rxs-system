@@ -2,13 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Volume2, 
   VolumeX, 
-  Printer, 
   Clock, 
-  Shield, 
-  UserCheck, 
-  ChefHat, 
   AlertTriangle, 
-  Banknote,
   Bell,
   X,
   CheckCheck,
@@ -17,10 +12,10 @@ import {
 import type { User, RawProduct } from '../types';
 
 interface HeaderProps {
-  printerStatus: { connected: boolean; paperReady: boolean };
+  printerStatus?: { connected: boolean; paperReady: boolean };
   soundEnabled: boolean;
   setSoundEnabled: (val: boolean) => void;
-  currentUser: User;
+  currentUser?: User;
   onOpenUserModal?: () => void;
   isSocketConnected?: boolean;
   lowStockIngredients?: RawProduct[];
@@ -29,12 +24,9 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  printerStatus,
   soundEnabled,
   setSoundEnabled,
-  currentUser,
-  lowStockIngredients = [],
-  onOpenCashDrawerModal
+  lowStockIngredients = []
 }) => {
   const [time, setTime] = useState(new Date());
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -106,72 +98,18 @@ export const Header: React.FC<HeaderProps> = ({
     setDismissedNotifIds(activeNotifications.map((n) => n.id));
   };
 
-  // Role permission check for Drawer Audit (Admin, Manager, Super Admin only)
-  const isAdminOrManager = Boolean(
-    currentUser && (
-      currentUser.role === 'Admin' ||
-      currentUser.role === 'Super Admin' ||
-      currentUser.role === 'Manager' ||
-      String(currentUser.role).toLowerCase().includes('admin') ||
-      String(currentUser.role).toLowerCase().includes('manager')
-    )
-  );
-
   return (
     <header className="h-16 bg-[#0f1217] border-b border-[#212833] px-5 flex items-center justify-between select-none font-sans">
-      {/* Left: Active Staff Badge */}
-      <div className="flex items-center gap-3">
-        {/* Active Cashier / Staff Badge */}
-        <div className="flex items-center gap-2 bg-[#151a21] p-1.5 pr-3 rounded-2xl border border-[#212833] shadow-inner">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-            isAdminOrManager ? 'bg-[#fed428]/20 text-[#fed428]' :
-            currentUser.role === 'Cashier' ? 'bg-[#0ca1e1]/20 text-[#0ca1e1]' :
-            'bg-amber-500/20 text-amber-400'
-          }`}>
-            {isAdminOrManager ? (
-              <Shield className="w-4 h-4" />
-            ) : currentUser.role === 'Cashier' ? (
-              <UserCheck className="w-4 h-4" />
-            ) : (
-              <ChefHat className="w-4 h-4" />
-            )}
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-xs font-black text-white leading-tight">
-              {currentUser.name}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                isAdminOrManager ? 'bg-[#fed428]' :
-                currentUser.role === 'Cashier' ? 'bg-[#0ca1e1]' : 'bg-amber-400'
-              }`}></span>
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                isAdminOrManager ? 'text-[#fed428]' :
-                currentUser.role === 'Cashier' ? 'text-[#0ca1e1]' : 'text-amber-400'
-              }`}>
-                {currentUser.role}
-              </span>
-            </div>
-          </div>
-        </div>
+      {/* Left: Date & Time Clock (placed cleanly on the left side) */}
+      <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-[#151a21] border border-[#212833] text-gray-300 text-xs font-mono shadow-inner">
+        <Clock className="w-4 h-4 text-[#fed428]" />
+        <span className="font-bold text-gray-200">{formattedDate}</span>
+        <span className="text-gray-500">•</span>
+        <span className="text-[#fed428] font-black">{formattedTime}</span>
       </div>
 
-      {/* Right: Drawer Audit (Admin Only), Notification Bell, Clock, Printer & Audio Controls */}
-      <div className="flex items-center gap-3">
-        {/* Drawer Audit Action Button - Admin / Manager / Super Admin Only */}
-        {isAdminOrManager && onOpenCashDrawerModal && (
-          <button
-            type="button"
-            onClick={onOpenCashDrawerModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] hover:bg-emerald-950/60 border border-[#212833] hover:border-emerald-700/60 text-emerald-400 text-xs font-bold transition-all cursor-pointer touch-manipulation active:scale-95 shadow-md"
-            title="Cash Drawer Balancing & Shift Audit (Admin/Manager Only)"
-          >
-            <Banknote className="w-4 h-4 text-emerald-400" />
-            <span>Drawer Audit</span>
-          </button>
-        )}
-
+      {/* Right: Notification Bell directly beside Sound On */}
+      <div className="flex items-center gap-2.5">
         {/* Sleek Notification Bell with Badge & Dropdown */}
         <div className="relative" ref={notifRef}>
           <button
@@ -270,33 +208,6 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Real-time Clock */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#151a21] border border-[#212833] text-gray-300 text-xs font-mono">
-          <Clock className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden md:inline">{formattedDate}</span>
-          <span className="text-[#fed428] font-bold">{formattedTime}</span>
-        </div>
-
-        {/* Printer Status */}
-        <div
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs border font-medium ${
-            !printerStatus.connected
-              ? 'bg-rose-950/40 border-rose-800 text-rose-300'
-              : !printerStatus.paperReady
-              ? 'bg-amber-950/40 border-amber-800 text-amber-300'
-              : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-400'
-          }`}
-        >
-          <Printer className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">
-            {!printerStatus.connected
-              ? 'Printer Offline'
-              : !printerStatus.paperReady
-              ? 'Paper Empty'
-              : 'Printer Ready'}
-          </span>
-        </div>
-
         {/* Sound Toggle */}
         <button
           type="button"
@@ -310,13 +221,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {soundEnabled ? (
             <>
-              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Sound On</span>
+              <Volume2 className="w-3.5 h-3.5 text-[#fed428]" />
+              <span>Sound On</span>
             </>
           ) : (
             <>
               <VolumeX className="w-3.5 h-3.5 text-gray-500" />
-              <span className="hidden sm:inline">Sound Off</span>
+              <span>Sound Off</span>
             </>
           )}
         </button>
