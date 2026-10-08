@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Boxes, 
   Plus, 
@@ -148,6 +148,24 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     }
     return minPortions === Infinity ? 0 : minPortions;
   };
+
+  // Maximum portions cookable for current modal item
+  const modalMaxCookable = useMemo(() => {
+    if (!prepModalItem) return 0;
+    return calculateCookablePortions(prepModalItem);
+  }, [prepModalItem, rawProducts]);
+
+  // Check if any ingredient is short for current prepPortions
+  const hasInsufficientIngredients = useMemo(() => {
+    if (!prepModalItem || !prepModalItem.recipe || prepModalItem.recipe.length === 0) return false;
+    if (prepPortions <= 0) return true;
+    return prepModalItem.recipe.some((ing) => {
+      if (!ing.productId || !ing.qty || ing.qty <= 0) return false;
+      const raw = rawProducts.find((p) => p.id === ing.productId);
+      const currentStock = raw ? raw.quantity : 0;
+      return currentStock < Number(ing.qty) * prepPortions;
+    });
+  }, [prepModalItem, prepPortions, rawProducts]);
 
   // Filtered lists
   const filteredMenuItems = menuItems.filter((m) => {
@@ -409,6 +427,23 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
   // Batch Prep / Cooking confirmation
   const handleConfirmBatchPrep = async () => {
     if (!prepModalItem || !onBatchPrep) return;
+    if (prepPortions <= 0) {
+      alert('Please enter a valid portion count greater than 0.');
+      return;
+    }
+    if (modalMaxCookable === 0) {
+      alert(`Cannot cook ${prepModalItem.name}: Raw ingredients are depleted!`);
+      return;
+    }
+    if (prepPortions > modalMaxCookable) {
+      alert(`Cannot cook ${prepPortions} portions! You only have raw ingredients for ${modalMaxCookable} portions.`);
+      return;
+    }
+    if (hasInsufficientIngredients) {
+      alert('Cannot cook portions: Insufficient raw ingredients.');
+      return;
+    }
+
     setIsSubmittingPrep(true);
     try {
       await onBatchPrep(prepModalItem.id, prepPortions);
@@ -709,13 +744,21 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                               type="button"
                               onClick={() => {
                                 setPrepModalItem(dish);
-                                setPrepPortions(10);
+                                setPrepPortions(cookable === 0 ? 0 : Math.min(10, cookable));
                               }}
-                              className="whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-[#0ca1e1]/15 hover:bg-[#0ca1e1]/25 text-[#0ca1e1] border border-[#0ca1e1]/40 font-bold text-[11px] transition-all flex items-center gap-1 active:scale-95 cursor-pointer shadow-sm"
-                              title="Cook / Batch Restock Portions"
+                              className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg border font-bold text-[11px] transition-all flex items-center gap-1 active:scale-95 cursor-pointer shadow-sm ${
+                                cookable === 0
+                                  ? 'bg-rose-950/25 hover:bg-rose-950/40 text-rose-400 border-rose-800/50'
+                                  : 'bg-[#0ca1e1]/15 hover:bg-[#0ca1e1]/25 text-[#0ca1e1] border border-[#0ca1e1]/40'
+                              }`}
+                              title={
+                                cookable === 0
+                                  ? 'Out of raw ingredients (Click to view missing items)'
+                                  : `Cook / Batch Restock Portions (Can cook up to ${cookable})`
+                              }
                             >
-                              <ChefHat className="w-3.5 h-3.5 text-[#0ca1e1] shrink-0" />
-                              <span>Cook</span>
+                              <ChefHat className="w-3.5 h-3.5 shrink-0" />
+                              <span>{cookable === 0 ? 'Out of Ing.' : 'Cook'}</span>
                             </button>
 
                             {/* Edit Food & Recipe */}
@@ -739,9 +782,25 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => onUpdateMenuStock(dish.id, dish.stock + 1)}
-                              className="w-7 h-7 rounded-lg bg-[#0c0e11] hover:bg-[#202733] border border-[#2b3543] text-gray-200 flex items-center justify-center font-black transition-all cursor-pointer active:scale-90"
-                              title="Increase Stock (+1)"
+                              disabled={recipeList.length > 0 && cookable === 0}
+                              onClick={() => {
+                                if (recipeList.length > 0) {
+                                  if (cookable === 0) return;
+                                  onBatchPrep ? onBatchPrep(dish.id, 1) : onUpdateMenuStock(dish.id, dish.stock + 1);
+                                } else {
+                                  onUpdateMenuStock(dish.id, dish.stock + 1);
+                                }
+                              }}
+                              className={`w-7 h-7 rounded-lg border flex items-center justify-center font-black transition-all ${
+                                recipeList.length > 0 && cookable === 0
+                                  ? 'bg-[#151a21] border-[#212833] text-gray-600 opacity-40 cursor-not-allowed'
+                                  : 'bg-[#0c0e11] hover:bg-[#202733] border border-[#2b3543] text-gray-200 cursor-pointer active:scale-90'
+                              }`}
+                              title={
+                                recipeList.length > 0 && cookable === 0
+                                  ? 'Cannot increase: Out of raw ingredients'
+                                  : 'Increase Stock (+1)'
+                              }
                             >
                               <Plus className="w-3 h-3 text-emerald-400" />
                             </button>
@@ -1418,41 +1477,103 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
 
             {/* Content */}
             <div className="py-3 space-y-3">
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">
-                  Portions to cook / restock:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={prepPortions}
-                  onChange={(e) => setPrepPortions(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="w-full bg-[#0c0e11] border border-[#212833] focus:border-[#0ca1e1] rounded-xl px-4 py-2.5 text-white font-mono font-bold text-lg outline-none"
-                />
-                <div className="flex items-center gap-1.5 mt-2">
-                  {[5, 10, 15, 20, 50].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setPrepPortions(num)}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
-                        prepPortions === num
-                          ? 'bg-[#0ca1e1] text-black border-[#0ca1e1]'
-                          : 'bg-[#0c0e11] text-gray-300 border-[#212833] hover:text-white'
-                      }`}
-                    >
-                      +{num}
-                    </button>
-                  ))}
+              {/* If modalMaxCookable === 0, show prominent blocking alert */}
+              {modalMaxCookable === 0 ? (
+                <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800 text-rose-300 flex items-start gap-3">
+                  <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-black text-sm uppercase tracking-wide text-rose-200">
+                      Cooking Blocked: Out of Raw Ingredients
+                    </div>
+                    <div className="text-xs text-rose-300/80 mt-1 leading-relaxed">
+                      You cannot cook any portions of <strong className="text-white">{prepModalItem.name}</strong> because one or more raw ingredients are completely depleted. Please restock raw supplies first before cooking.
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <label className="font-bold text-gray-300">
+                      Portions to cook / restock:
+                    </label>
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                      <span>Max Available:</span>
+                      <strong>{modalMaxCookable} portions</strong>
+                    </span>
+                  </div>
+
+                  <input
+                    type="number"
+                    min="1"
+                    max={modalMaxCookable}
+                    value={prepPortions === 0 ? '' : prepPortions}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setPrepPortions(0);
+                        return;
+                      }
+                      const val = parseInt(raw, 10);
+                      if (isNaN(val)) setPrepPortions(0);
+                      else {
+                        setPrepPortions(Math.min(modalMaxCookable, Math.max(1, val)));
+                      }
+                    }}
+                    className={`w-full bg-[#0c0e11] border rounded-xl px-4 py-2.5 text-white font-mono font-bold text-lg outline-none transition-all ${
+                      prepPortions > modalMaxCookable || prepPortions <= 0
+                        ? 'border-rose-500 focus:border-rose-500'
+                        : 'border-[#212833] focus:border-[#0ca1e1]'
+                    }`}
+                  />
+
+                  {prepPortions > modalMaxCookable && (
+                    <p className="text-[11px] text-rose-400 font-bold mt-1">
+                      ⚠️ Entered count exceeds available raw ingredients! Maximum is {modalMaxCookable}.
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    {[1, 5, 10, 20].map((num) => {
+                      const isAvailable = num <= modalMaxCookable;
+                      return (
+                        <button
+                          key={num}
+                          type="button"
+                          disabled={!isAvailable}
+                          onClick={() => setPrepPortions(num)}
+                          className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition-all ${
+                            !isAvailable
+                              ? 'bg-[#0c0e11] text-gray-600 border-[#212833] opacity-40 cursor-not-allowed'
+                              : prepPortions === num
+                              ? 'bg-[#0ca1e1] text-black border-[#0ca1e1] cursor-pointer'
+                              : 'bg-[#0c0e11] text-gray-300 border-[#212833] hover:text-white cursor-pointer'
+                          }`}
+                        >
+                          +{num}
+                        </button>
+                      );
+                    })}
+
+                    {/* Max Button */}
+                    <button
+                      type="button"
+                      onClick={() => setPrepPortions(modalMaxCookable)}
+                      className="px-3 py-1 rounded-lg text-xs font-mono font-bold border border-[#fed428]/40 bg-[#fed428]/15 hover:bg-[#fed428]/25 text-[#fed428] transition-all cursor-pointer ml-auto flex items-center gap-1"
+                      title={`Cook maximum possible portions (${modalMaxCookable})`}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Max ({modalMaxCookable})</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Recipe Breakdown & Required Ingredients Calculation */}
               <div className="p-3 rounded-2xl bg-[#0c0e11] border border-[#212833]">
                 <h4 className="text-xs font-bold text-gray-300 mb-2 flex items-center justify-between">
                   <span>Raw Ingredients Deduction Preview:</span>
                   <span className="text-[10px] text-gray-500 font-mono">
-                    ({prepPortions} portions x recipe)
+                    ({prepPortions || 0} portions x recipe)
                   </span>
                 </h4>
 
@@ -1463,10 +1584,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                 ) : (
                   <div className="space-y-1.5">
                     {prepModalItem.recipe.map((ing, idx) => {
-                      const totalNeeded = Number(ing.qty) * prepPortions;
+                      const totalNeeded = Number(ing.qty) * (prepPortions || 1);
                       const raw = rawProducts.find((p) => p.id === ing.productId);
                       const currentStock = raw ? raw.quantity : 0;
                       const hasEnough = currentStock >= totalNeeded;
+                      const deficit = totalNeeded - currentStock;
 
                       return (
                         <div
@@ -1488,7 +1610,9 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                               -{totalNeeded} {ing.uom}
                             </div>
                             <div className={`text-[10px] ${hasEnough ? 'text-gray-400' : 'text-rose-400 font-bold'}`}>
-                              On hand: {currentStock} {ing.uom} {hasEnough ? '✓' : '(LOW)'}
+                              {hasEnough
+                                ? `On hand: ${currentStock} ${ing.uom} ✓`
+                                : `On hand: ${currentStock} ${ing.uom} (SHORT BY ${deficit.toFixed(1)} ${ing.uom})`}
                             </div>
                           </div>
                         </div>
@@ -1510,14 +1634,24 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
               </button>
               <button
                 type="button"
-                disabled={isSubmittingPrep}
+                disabled={
+                  isSubmittingPrep ||
+                  modalMaxCookable === 0 ||
+                  prepPortions <= 0 ||
+                  prepPortions > modalMaxCookable ||
+                  hasInsufficientIngredients
+                }
                 onClick={handleConfirmBatchPrep}
-                className="px-5 py-2 rounded-xl bg-[#fed428] hover:bg-[#fed428]/90 text-black text-xs font-black transition-all cursor-pointer shadow-lg shadow-[#fed428]/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-[#fed428] hover:bg-[#fed428]/90 text-black text-xs font-black transition-all cursor-pointer shadow-lg shadow-[#fed428]/20 flex items-center gap-1.5 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChefHat className="w-4 h-4" />
                 <span>
                   {isSubmittingPrep
                     ? 'Cooking...'
+                    : modalMaxCookable === 0
+                    ? '🚫 Out of Raw Ingredients (Cannot Cook)'
+                    : hasInsufficientIngredients
+                    ? '⚠️ Insufficient Raw Stock'
                     : `Confirm Cook (+${prepPortions} Portions)`}
                 </span>
               </button>

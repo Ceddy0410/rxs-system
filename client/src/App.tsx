@@ -616,44 +616,26 @@ export const App: React.FC = () => {
 
   // Batch Prep / Cooking: Cooks portions & deducts required ingredients
   const handleBatchPrep = async (menuId: number, portions: number) => {
-    playBeep(1100, 'sine', 0.1);
     const numPortions = Number(portions);
     if (isNaN(numPortions) || numPortions <= 0) return;
 
-    // 1. Locally increment menu stock
-    setMenuItems((prev) => {
-      const updated = prev.map((m) => {
-        if (m.id === menuId) {
-          return { ...m, stock: m.stock + numPortions };
-        }
-        return m;
-      });
-      try {
-        localStorage.setItem('fiddle_menu', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-
-    // 2. Locally deduct raw ingredients based on recipe
+    // 1. Client-side validation: Check all raw ingredients
     const targetMenu = menuItems.find((m) => m.id === menuId);
-    if (targetMenu && Array.isArray(targetMenu.recipe)) {
-      setRawProducts((prev) => {
-        let updated = [...prev];
-        targetMenu.recipe!.forEach((ing) => {
-          const totalDeduct = Number(ing.qty) * numPortions;
-          updated = updated.map((raw) => {
-            if (raw.id === ing.productId) {
-              return { ...raw, quantity: Math.max(0, raw.quantity - totalDeduct) };
-            }
-            return raw;
-          });
-        });
-        try {
-          localStorage.setItem('fiddle_products', JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
-      });
+    if (targetMenu && Array.isArray(targetMenu.recipe) && targetMenu.recipe.length > 0) {
+      for (const ing of targetMenu.recipe) {
+        if (ing.productId && ing.qty && Number(ing.qty) > 0) {
+          const raw = rawProducts.find((p) => p.id === ing.productId);
+          const currentStock = raw ? raw.quantity : 0;
+          const totalNeeded = Number(ing.qty) * numPortions;
+          if (currentStock < totalNeeded) {
+            alert(`Cannot cook ${numPortions}x portions of "${targetMenu.name}"!\n\nInsufficient raw ingredient: ${ing.productName || 'Ingredient'}\nNeeded: ${totalNeeded} ${ing.uom}\nAvailable in stock: ${currentStock} ${ing.uom}`);
+            return;
+          }
+        }
+      }
     }
+
+    playBeep(1100, 'sine', 0.1);
 
     try {
       const res = await apiFetch(`/api/menu/${menuId}/prep`, {
@@ -662,21 +644,35 @@ export const App: React.FC = () => {
         body: JSON.stringify({ portions: numPortions, user: currentUser.name })
       });
       const data = await res.json();
-      if (data.success) {
-        if (data.menuItem) {
-          setMenuItems((prev) => prev.map((m) => (m.id === menuId ? data.menuItem : m)));
-        }
-        if (Array.isArray(data.deductedIngredients)) {
-          setRawProducts((prev) => {
-            let updated = [...prev];
-            data.deductedIngredients.forEach((d: RawProduct) => {
-              updated = updated.map((r) => (r.id === d.id ? d : r));
-            });
-            return updated;
-          });
-        }
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Cannot cook portions due to insufficient raw ingredients.');
+        return;
       }
-    } catch (e) {}
+
+      if (data.menuItem) {
+        setMenuItems((prev) => {
+          const updated = prev.map((m) => (m.id === menuId ? data.menuItem : m));
+          try {
+            localStorage.setItem('fiddle_menu', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      }
+      if (Array.isArray(data.deductedIngredients)) {
+        setRawProducts((prev) => {
+          let updated = [...prev];
+          data.deductedIngredients.forEach((d: RawProduct) => {
+            updated = updated.map((r) => (r.id === d.id ? d : r));
+          });
+          try {
+            localStorage.setItem('fiddle_products', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
+      }
+    } catch (e: any) {
+      alert('Error updating cooked portions: ' + (e.message || 'Network error'));
+    }
   };
 
   // Create New Raw Ingredient / Supply (Optimistic + Offline Tablet Persistent)

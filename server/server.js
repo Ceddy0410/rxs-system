@@ -157,11 +157,29 @@ app.post('/api/menu/:id/prep', async (req, res) => {
     const recipe = typeof menuItem.recipeJson === 'string'
       ? JSON.parse(menuItem.recipeJson || '[]')
       : (menuItem.recipeJson || []);
-    const deductedIngredients = [];
 
-    // 1. Deduct raw ingredients
+    // 1. STRICT VALIDATION: Check that all required raw ingredients have sufficient stock!
     for (const ing of recipe) {
-      if (ing.productId && ing.qty) {
+      if (ing.productId && ing.qty && Number(ing.qty) > 0) {
+        const totalNeeded = Number(ing.qty) * numPortions;
+        const [prod] = await query('SELECT * FROM product_tbl WHERE id = ?', [ing.productId]);
+        if (!prod) {
+          return res.status(400).json({
+            error: `Raw ingredient "${ing.productName || 'ID ' + ing.productId}" not found in inventory.`
+          });
+        }
+        if (Number(prod.quantity) < totalNeeded) {
+          return res.status(400).json({
+            error: `Cannot cook ${numPortions}x portions of "${menuItem.name}". Insufficient "${prod.name}" (Required: ${totalNeeded} ${prod.uom}, Available in stock: ${prod.quantity} ${prod.uom}).`
+          });
+        }
+      }
+    }
+
+    // 2. All ingredients verified! Deduct raw ingredients
+    const deductedIngredients = [];
+    for (const ing of recipe) {
+      if (ing.productId && ing.qty && Number(ing.qty) > 0) {
         const totalDeduct = Number(ing.qty) * numPortions;
         await query('UPDATE product_tbl SET quantity = MAX(0, quantity - ?) WHERE id = ?', [totalDeduct, ing.productId]);
         await query(
@@ -176,7 +194,7 @@ app.post('/api/menu/:id/prep', async (req, res) => {
       }
     }
 
-    // 2. Increment menu portions
+    // 3. Increment menu portions
     await query('UPDATE menu_tbl SET stock = stock + ? WHERE id = ?', [numPortions, id]);
     const [updatedMenu] = await query('SELECT * FROM menu_tbl WHERE id = ?', [id]);
     io.emit('stock:updated', { id: Number(id), stock: updatedMenu.stock });
