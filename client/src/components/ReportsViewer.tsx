@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Order } from '../types';
 import { ReceiptModal } from './ReceiptModal';
+import { apiFetch } from '../apiConfig';
 
 interface ReportsViewerProps {
   orders?: Order[];
@@ -224,7 +225,7 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ orders = [], onRef
 
   const handlePrintZReading = async () => {
     try {
-      await fetch('/api/printer/test', { method: 'POST' });
+      await apiFetch('/api/printer/test', { method: 'POST' });
     } catch (e) {}
     setPrintSuccessNotice(true);
     setTimeout(() => setPrintSuccessNotice(false), 4000);

@@ -13,6 +13,7 @@ import {
   Lock
 } from 'lucide-react';
 import type { User } from '../types';
+import { apiFetch } from '../apiConfig';
 
 interface UserManagementModalProps {
   currentUser: User;
@@ -45,7 +46,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   // Fetch users from server or fallback
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/users');
+      const res = await apiFetch('/api/users');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -84,7 +85,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const handleConfirmLogin = async (user: User) => {
     setLoginError('');
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +135,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     try {
       if (formUserId) {
         // UPDATE
-        const res = await fetch(`/api/users/${formUserId}`, {
+        const res = await apiFetch(`/api/users/${formUserId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -144,7 +145,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         }
       } else {
         // CREATE
-        const res = await fetch('/api/users', {
+        const res = await apiFetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -177,7 +178,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (!window.confirm('Are you sure you want to remove this staff account?')) return;
 
     try {
-      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
       await fetchUsers();
     } catch (e) {
       const updatedList = users.filter((u) => u.id !== userId);

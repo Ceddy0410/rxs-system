@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Printer, AlertOctagon, CheckCircle2, RefreshCw, Play, FileText, Wrench } from 'lucide-react';
+import { apiFetch } from '../apiConfig';
 
 interface PrinterMaintenanceProps {
   printerStatus: { connected: boolean; paperReady: boolean; printerModel?: string; jobsCount?: number };
@@ -19,7 +20,7 @@ export const PrinterMaintenance: React.FC<PrinterMaintenanceProps> = ({
     setTestResult(null);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/printer/test', { method: 'POST' });
+      const res = await apiFetch('/api/printer/test', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setTestResult(data.rawReceipt);
@@ -62,14 +63,14 @@ Change        :              PHP     155.00
 
   const handleTogglePaper = async () => {
     try {
-      await fetch('/api/printer/toggle-paper', { method: 'POST' });
+      await apiFetch('/api/printer/toggle-paper', { method: 'POST' });
       onRefreshStatus();
     } catch (e) {}
   };
 
   const handleToggleConnection = async () => {
     try {
-      await fetch('/api/printer/toggle-connection', { method: 'POST' });
+      await apiFetch('/api/printer/toggle-connection', { method: 'POST' });
       onRefreshStatus();
     } catch (e) {}
   };

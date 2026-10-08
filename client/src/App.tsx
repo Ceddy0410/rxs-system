@@ -12,6 +12,8 @@ import { ReportsViewer } from './components/ReportsViewer';
 import { DashboardView } from './components/DashboardView';
 import { PrinterMaintenance } from './components/PrinterMaintenance';
 import { UserManagementModal } from './components/UserManagementModal';
+import { ServerConnectionModal } from './components/ServerConnectionModal';
+import { apiFetch, getServerUrl } from './apiConfig';
 import type { MenuItem, CartItem, RawProduct, Order, User } from './types';
 import { FALLBACK_MENU, FALLBACK_PRODUCTS } from './initialData';
 
@@ -60,6 +62,7 @@ export const App: React.FC = () => {
   const [isPaymentOpen, setIsPaymentOpen] = useState<boolean>(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
+  const [isServerModalOpen, setIsServerModalOpen] = useState<boolean>(false);
 
   // Audio Context Ref
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -126,10 +129,10 @@ export const App: React.FC = () => {
   const fetchData = async () => {
     try {
       const [menuRes, prodRes, ordRes, statusRes] = await Promise.all([
-        fetch('/api/menu').then((r) => r.json()),
-        fetch('/api/products').then((r) => r.json()),
-        fetch('/api/orders').then((r) => r.json()),
-        fetch('/api/status').then((r) => r.json())
+        apiFetch('/api/menu').then((r) => r.json()),
+        apiFetch('/api/products').then((r) => r.json()),
+        apiFetch('/api/orders').then((r) => r.json()),
+        apiFetch('/api/status').then((r) => r.json())
       ]);
 
       if (Array.isArray(menuRes) && menuRes.length > 0) {
@@ -163,12 +166,14 @@ export const App: React.FC = () => {
     fetchData();
 
     // Setup WebSockets for Real-time Multi-Screen Sync
-    const socket: Socket = io({
+    const serverUrl = getServerUrl();
+    const socket: Socket = io(serverUrl || undefined, {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 10000
+      timeout: 10000,
+      transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
@@ -338,7 +343,7 @@ export const App: React.FC = () => {
     };
 
     try {
-      const res = await fetch('/api/orders', {
+      const res = await apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -428,7 +433,7 @@ export const App: React.FC = () => {
 
     // 2. Notify backend server if reachable
     try {
-      await fetch(`/api/orders/${orderId}/status`, {
+      await apiFetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -450,7 +455,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      await fetch(`/api/menu/${id}/stock`, {
+      await apiFetch(`/api/menu/${id}/stock`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock: newStock })
@@ -483,7 +488,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      await fetch('/api/inventory/adjust', {
+      await apiFetch('/api/inventory/adjust', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, processType, qty, notes, user: currentUser.name })
@@ -518,7 +523,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      const res = await fetch('/api/menu', {
+      const res = await apiFetch('/api/menu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newItem)
@@ -548,7 +553,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      const res = await fetch(`/api/menu/${item.id}`, {
+      const res = await apiFetch(`/api/menu/${item.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(item)
@@ -578,7 +583,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      await fetch(`/api/menu/${id}`, {
+      await apiFetch(`/api/menu/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {}
@@ -626,7 +631,7 @@ export const App: React.FC = () => {
     }
 
     try {
-      const res = await fetch(`/api/menu/${menuId}/prep`, {
+      const res = await apiFetch(`/api/menu/${menuId}/prep`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ portions: numPortions, user: currentUser.name })
@@ -672,7 +677,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      const res = await fetch('/api/products', {
+      const res = await apiFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProd)
@@ -698,7 +703,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      const res = await fetch(`/api/products/${prod.id}`, {
+      const res = await apiFetch(`/api/products/${prod.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prod)
@@ -724,7 +729,7 @@ export const App: React.FC = () => {
     });
 
     try {
-      await fetch(`/api/products/${id}`, {
+      await apiFetch(`/api/products/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {}
@@ -807,6 +812,7 @@ export const App: React.FC = () => {
           onOpenUserModal={() => setIsUserModalOpen(true)}
           isSocketConnected={isSocketConnected}
           lowStockIngredients={lowStockIngredients}
+          onOpenServerModal={() => setIsServerModalOpen(true)}
         />
 
         {/* Tab Views */}
@@ -901,6 +907,17 @@ export const App: React.FC = () => {
           onClose={() => setIsUserModalOpen(false)}
         />
       )}
+
+      {/* Server & LAN Sync Modal */}
+      <ServerConnectionModal
+        isOpen={isServerModalOpen}
+        onClose={() => setIsServerModalOpen(false)}
+        isSocketConnected={isSocketConnected}
+        onServerChanged={() => {
+          fetchData();
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

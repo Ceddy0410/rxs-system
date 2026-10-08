@@ -22,6 +22,7 @@ interface HeaderProps {
   onOpenUserModal?: () => void;
   isSocketConnected?: boolean;
   lowStockIngredients?: RawProduct[];
+  onOpenServerModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,7 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onOpenUserModal,
   isSocketConnected = true,
-  lowStockIngredients = []
+  lowStockIngredients = [],
+  onOpenServerModal
 }) => {
   const [time, setTime] = useState(new Date());
 
@@ -104,18 +106,20 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Real-time WebSocket Health Pill */}
-        <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-semibold border ${
+        {/* Real-time WebSocket Health Pill / Server Connection trigger */}
+        <button
+          type="button"
+          onClick={onOpenServerModal}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-semibold border transition-all cursor-pointer touch-manipulation active:scale-95 ${
             isSocketConnected
-              ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400'
-              : 'bg-rose-950/40 border-rose-800/60 text-rose-400 animate-pulse'
+              ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/50'
+              : 'bg-rose-950/40 border-rose-800/60 text-rose-400 animate-pulse hover:bg-rose-900/50'
           }`}
-          title={isSocketConnected ? 'WebSocket Real-Time Sync Active' : 'WebSocket Disconnected - Reconnecting...'}
+          title={isSocketConnected ? 'WebSocket Real-Time Sync Active (Click to configure Server IP)' : 'WebSocket Disconnected (Click to configure Server IP)'}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
           <span>{isSocketConnected ? 'LIVE SYNC' : 'OFFLINE'}</span>
-        </div>
+        </button>
       </div>
 
       {/* Right: Status Controls */}
