@@ -64,7 +64,7 @@ export interface User {
   id: string | number;
   username: string;
   name: string;
-  role: 'Admin' | 'Cashier' | 'Kitchen';
+  role: 'Admin' | 'Super Admin' | 'Manager' | 'Cashier' | 'Kitchen';
   avatar?: string;
   status?: string;
   password?: string;

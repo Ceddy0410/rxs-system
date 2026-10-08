@@ -33,9 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   soundEnabled,
   setSoundEnabled,
   currentUser,
-  isSocketConnected = true,
   lowStockIngredients = [],
-  onOpenServerModal,
   onOpenCashDrawerModal
 }) => {
   const [time, setTime] = useState(new Date());
@@ -108,18 +106,29 @@ export const Header: React.FC<HeaderProps> = ({
     setDismissedNotifIds(activeNotifications.map((n) => n.id));
   };
 
+  // Role permission check for Drawer Audit (Admin, Manager, Super Admin only)
+  const isAdminOrManager = Boolean(
+    currentUser && (
+      currentUser.role === 'Admin' ||
+      currentUser.role === 'Super Admin' ||
+      currentUser.role === 'Manager' ||
+      String(currentUser.role).toLowerCase().includes('admin') ||
+      String(currentUser.role).toLowerCase().includes('manager')
+    )
+  );
+
   return (
     <header className="h-16 bg-[#0f1217] border-b border-[#212833] px-5 flex items-center justify-between select-none font-sans">
-      {/* Left: Active Staff, Drawer Audit & Real-Time Sync Indicator */}
+      {/* Left: Active Staff Badge */}
       <div className="flex items-center gap-3">
         {/* Active Cashier / Staff Badge */}
         <div className="flex items-center gap-2 bg-[#151a21] p-1.5 pr-3 rounded-2xl border border-[#212833] shadow-inner">
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-            currentUser.role === 'Admin' ? 'bg-[#fed428]/20 text-[#fed428]' :
+            isAdminOrManager ? 'bg-[#fed428]/20 text-[#fed428]' :
             currentUser.role === 'Cashier' ? 'bg-[#0ca1e1]/20 text-[#0ca1e1]' :
             'bg-amber-500/20 text-amber-400'
           }`}>
-            {currentUser.role === 'Admin' ? (
+            {isAdminOrManager ? (
               <Shield className="w-4 h-4" />
             ) : currentUser.role === 'Cashier' ? (
               <UserCheck className="w-4 h-4" />
@@ -134,50 +143,35 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
             <div className="flex items-center gap-1.5">
               <span className={`w-1.5 h-1.5 rounded-full ${
-                currentUser.role === 'Admin' ? 'bg-[#fed428]' :
+                isAdminOrManager ? 'bg-[#fed428]' :
                 currentUser.role === 'Cashier' ? 'bg-[#0ca1e1]' : 'bg-amber-400'
               }`}></span>
               <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                currentUser.role === 'Admin' ? 'text-[#fed428]' :
+                isAdminOrManager ? 'text-[#fed428]' :
                 currentUser.role === 'Cashier' ? 'text-[#0ca1e1]' : 'text-amber-400'
               }`}>
                 {currentUser.role}
               </span>
             </div>
           </div>
-
-          {/* Drawer Audit Action Button */}
-          {onOpenCashDrawerModal && currentUser.role !== 'Kitchen' && (
-            <button
-              type="button"
-              onClick={onOpenCashDrawerModal}
-              className="ml-2 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0c0e11] hover:bg-emerald-950/60 border border-[#212833] hover:border-emerald-700/60 text-emerald-400 text-[11px] font-bold transition-all cursor-pointer touch-manipulation active:scale-95"
-              title="Cash Drawer Balancing & Shift Audit (X-Reading)"
-            >
-              <Banknote className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Drawer Audit</span>
-            </button>
-          )}
         </div>
-
-        {/* Real-time WebSocket Health Pill / Server Connection trigger */}
-        <button
-          type="button"
-          onClick={onOpenServerModal}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono font-semibold border transition-all cursor-pointer touch-manipulation active:scale-95 ${
-            isSocketConnected
-              ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/50'
-              : 'bg-rose-950/40 border-rose-800/60 text-rose-400 animate-pulse hover:bg-rose-900/50'
-          }`}
-          title={isSocketConnected ? 'WebSocket Real-Time Sync Active (Click to configure Server IP)' : 'WebSocket Disconnected (Click to configure Server IP)'}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
-          <span>{isSocketConnected ? 'LIVE SYNC' : 'OFFLINE'}</span>
-        </button>
       </div>
 
-      {/* Right: Notification Bell, Clock, Printer & Audio Controls */}
+      {/* Right: Drawer Audit (Admin Only), Notification Bell, Clock, Printer & Audio Controls */}
       <div className="flex items-center gap-3">
+        {/* Drawer Audit Action Button - Admin / Manager / Super Admin Only */}
+        {isAdminOrManager && onOpenCashDrawerModal && (
+          <button
+            type="button"
+            onClick={onOpenCashDrawerModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] hover:bg-emerald-950/60 border border-[#212833] hover:border-emerald-700/60 text-emerald-400 text-xs font-bold transition-all cursor-pointer touch-manipulation active:scale-95 shadow-md"
+            title="Cash Drawer Balancing & Shift Audit (Admin/Manager Only)"
+          >
+            <Banknote className="w-4 h-4 text-emerald-400" />
+            <span>Drawer Audit</span>
+          </button>
+        )}
+
         {/* Sleek Notification Bell with Badge & Dropdown */}
         <div className="relative" ref={notifRef}>
           <button
