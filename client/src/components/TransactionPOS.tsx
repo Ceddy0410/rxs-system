@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Flame, Plus, Check, Sparkles } from 'lucide-react';
+import { Search, Flame, Plus, Check } from 'lucide-react';
 import type { MenuItem, CartItem } from '../types';
 
 interface TransactionPOSProps {
@@ -7,25 +7,18 @@ interface TransactionPOSProps {
   onAddToCart: (item: CartItem) => void;
 }
 
-// Available toppings & bundle promo upgrades
-const ADDON_OPTIONS = [
-  // Classic Extras
-  { name: 'Pork Chashu (3 slices)', price: 60, group: 'toppings', desc: 'Extra marinated chashu slices' },
-  { name: 'Tamago Egg', price: 25, group: 'toppings', desc: 'Soft-boiled seasoned ramen egg' },
-  { name: 'Extra Nori', price: 20, group: 'toppings', desc: 'Crispy seaweed sheets' },
-
-  // Promo Meal Bundles & Combos (User: "1 ramen and 1 rice meal = bundle or with drinks")
-  { name: '🍱 Promo Bundle: Mini Chashu Rice Bowl', price: 95, group: 'bundles', desc: 'Add rice bowl at discounted combo price', badge: 'MEAL BUNDLE' },
-  { name: '🥟 Promo Bundle: 3pcs Gyoza Side', price: 65, group: 'bundles', desc: 'Crispy Japanese pork gyoza', badge: 'COMBO' },
-  { name: '🥤 Promo Bundle: Refreshing Iced Tea', price: 35, group: 'bundles', desc: 'Save ₱35 on house iced tea drink', badge: 'DRINK COMBO' },
-  { name: '🥤 Promo Bundle: Lychee Fruit Tea', price: 45, group: 'bundles', desc: 'Save ₱25 on fresh fruit tea', badge: 'DRINK COMBO' }
+// Available toppings for Ramen
+const RAMEN_ADDONS = [
+  { name: 'Pork Chashu (3 slices)', price: 60, desc: 'Extra marinated chashu slices' },
+  { name: 'Tamago Egg', price: 25, desc: 'Soft-boiled seasoned ramen egg' },
+  { name: 'Extra Nori', price: 20, desc: 'Crispy seaweed sheets' }
 ];
 
 export const TransactionPOS: React.FC<TransactionPOSProps> = ({ menuItems, onAddToCart }) => {
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
-  // Customization Modal State (for Ramen spice/addons & promo bundle add-ons)
+  // Customization Modal State (for Ramen spice & toppings)
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const [selectedSpice, setSelectedSpice] = useState<'Mild' | 'Hot' | 'Extra Hot'>('Mild');
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
@@ -41,13 +34,13 @@ export const TransactionPOS: React.FC<TransactionPOSProps> = ({ menuItems, onAdd
   const handleDishClick = (dish: MenuItem) => {
     if (dish.stock <= 0) return;
 
-    if (dish.category === 'Ramen' || dish.category === 'Rice Meals') {
-      // Open customization modal for spice & bundle addons
+    if (dish.category === 'Ramen') {
+      // Open customization modal for Ramen spice & extra toppings
       setSelectedDish(dish);
       setSelectedSpice('Mild');
       setSelectedAddons([]);
     } else {
-      // Direct add to cart for drinks, standalone bundles
+      // Direct add to cart for Rice Meals, Drinks, Bundles/Promos
       onAddToCart({
         cartId: `${dish.id}-${Date.now()}`,
         id: dish.id,
@@ -63,7 +56,7 @@ export const TransactionPOS: React.FC<TransactionPOSProps> = ({ menuItems, onAdd
   };
 
   const currentAddonExtra = selectedAddons.reduce((sum, name) => {
-    const match = ADDON_OPTIONS.find((a) => a.name === name);
+    const match = RAMEN_ADDONS.find((a) => a.name === name);
     return sum + (match ? match.price : 0);
   }, 0);
 
@@ -244,60 +237,15 @@ export const TransactionPOS: React.FC<TransactionPOSProps> = ({ menuItems, onAdd
               </div>
             )}
 
-            {/* Customization Options: Toppings & Promo Bundles */}
-            <div className="mt-4 space-y-4 max-h-[46vh] overflow-y-auto pr-1">
-              {/* Group 1: Classic Extras & Toppings */}
-              {selectedDish.category === 'Ramen' && (
-                <div>
-                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                    <Plus className="w-3.5 h-3.5 text-[#0ca1e1]" />
-                    <span>Ramen Toppings & Extras</span>
-                  </label>
-                  <div className="space-y-1.5">
-                    {ADDON_OPTIONS.filter((a) => a.group === 'toppings').map((addon) => {
-                      const isChecked = selectedAddons.includes(addon.name);
-                      return (
-                        <div
-                          key={addon.name}
-                          onClick={() => toggleAddon(addon.name)}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
-                            isChecked
-                              ? 'bg-[#0ca1e1]/10 border-[#0ca1e1] text-white'
-                              : 'bg-[#0f1217] border-[#212833] text-gray-300 hover:border-gray-600'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
-                              isChecked ? 'bg-[#0ca1e1] border-[#0ca1e1] text-black' : 'border-gray-600'
-                            }`}>
-                              {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                            </div>
-                            <div>
-                              <span className="text-xs font-bold block">{addon.name}</span>
-                              <span className="text-[10px] text-gray-500">{addon.desc}</span>
-                            </div>
-                          </div>
-                          <span className="text-xs font-bold text-[#fed428] font-mono shrink-0">+₱{addon.price}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Group 2: Promo Meal Bundles & Combos (User: 1 ramen + 1 rice meal or drink = bundle) */}
+            {/* Ramen Extras & Toppings */}
+            <div className="mt-4 space-y-3 max-h-[46vh] overflow-y-auto pr-1">
               <div>
-                <label className="text-[11px] font-bold text-[#fed428] uppercase tracking-wider flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-[#fed428]" />
-                    <span>Promo Meal Bundles & Drink Combos</span>
-                  </div>
-                  <span className="text-[10px] bg-[#fed428]/15 border border-[#fed428]/30 px-1.5 py-0.5 rounded font-bold font-mono">
-                    COMBO UPGRADE
-                  </span>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                  <Plus className="w-3.5 h-3.5 text-[#0ca1e1]" />
+                  <span>Ramen Toppings & Extras</span>
                 </label>
                 <div className="space-y-1.5">
-                  {ADDON_OPTIONS.filter((a) => a.group === 'bundles').map((addon) => {
+                  {RAMEN_ADDONS.map((addon) => {
                     const isChecked = selectedAddons.includes(addon.name);
                     return (
                       <div
@@ -305,29 +253,22 @@ export const TransactionPOS: React.FC<TransactionPOSProps> = ({ menuItems, onAdd
                         onClick={() => toggleAddon(addon.name)}
                         className={`flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-all ${
                           isChecked
-                            ? 'bg-[#fed428]/10 border-[#fed428] text-white shadow-sm'
+                            ? 'bg-[#0ca1e1]/10 border-[#0ca1e1] text-white'
                             : 'bg-[#0f1217] border-[#212833] text-gray-300 hover:border-gray-600'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <div className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${
-                            isChecked ? 'bg-[#fed428] border-[#fed428] text-black' : 'border-gray-600'
+                            isChecked ? 'bg-[#0ca1e1] border-[#0ca1e1] text-black' : 'border-gray-600'
                           }`}>
                             {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold">{addon.name}</span>
-                              {addon.badge && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#0ca1e1]/20 text-[#0ca1e1] border border-[#0ca1e1]/30">
-                                  {addon.badge}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-gray-400">{addon.desc}</span>
+                            <span className="text-xs font-bold block">{addon.name}</span>
+                            <span className="text-[10px] text-gray-500">{addon.desc}</span>
                           </div>
                         </div>
-                        <span className="text-xs font-black text-emerald-400 font-mono shrink-0">+₱{addon.price}</span>
+                        <span className="text-xs font-bold text-[#fed428] font-mono shrink-0">+₱{addon.price}</span>
                       </div>
                     );
                   })}

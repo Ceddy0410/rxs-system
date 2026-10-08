@@ -15,7 +15,8 @@ import {
   Sparkles,
   Info,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Tag
 } from 'lucide-react';
 import type { MenuItem, RawProduct, RecipeIngredient } from '../types';
 
@@ -115,6 +116,109 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
   const [foodUom, setFoodUom] = useState('serving');
   const [foodImage, setFoodImage] = useState('/images/Ramen/Kuro.png');
   const [foodRecipe, setFoodRecipe] = useState<RecipeIngredient[]>([]);
+
+  // Bundle / Promo Meal Components State
+  const [bundleItems, setBundleItems] = useState<{ dishId: number; qty: number }[]>([]);
+
+  // Check if current category is Bundle / Promo
+  const isBundleCategory = useMemo(() => {
+    const c = foodCategory.trim().toLowerCase();
+    return c === 'bundle' || c === 'bundle / promo' || c === 'promo' || c.includes('bundle') || c.includes('promo');
+  }, [foodCategory]);
+
+  // Available existing meals/ramens/drinks to pick for bundles (exclude other bundles & itself)
+  const bundleAvailableDishes = useMemo(() => {
+    return menuItems.filter((m) => {
+      const cat = m.category.toLowerCase();
+      const isB = cat.includes('bundle') || cat.includes('promo');
+      const isSelf = editingMenuItem && m.id === editingMenuItem.id;
+      return !isB && !isSelf;
+    });
+  }, [menuItems, editingMenuItem]);
+
+  // Combined regular a la carte price of all dishes in the bundle
+  const bundleRegularTotal = useMemo(() => {
+    return bundleItems.reduce((sum, item) => {
+      const dish = menuItems.find((m) => m.id === item.dishId);
+      return sum + (dish ? Number(dish.price) * item.qty : 0);
+    }, 0);
+  }, [bundleItems, menuItems]);
+
+  // Aggregate raw ingredients from all selected bundle dishes
+  const compileBundleRecipe = (items: { dishId: number; qty: number }[]): RecipeIngredient[] => {
+    const map: { [prodId: number]: RecipeIngredient } = {};
+    for (const b of items) {
+      const dish = menuItems.find((m) => m.id === b.dishId);
+      if (dish && Array.isArray(dish.recipe)) {
+        for (const ing of dish.recipe) {
+          if (!ing.productId || !ing.qty || Number(ing.qty) <= 0) continue;
+          if (!map[ing.productId]) {
+            map[ing.productId] = {
+              productId: ing.productId,
+              productName: ing.productName,
+              qty: Number(ing.qty) * Number(b.qty),
+              uom: ing.uom
+            };
+          } else {
+            map[ing.productId].qty += Number(ing.qty) * Number(b.qty);
+          }
+        }
+      }
+    }
+    return Object.values(map);
+  };
+
+  const compiledBundleRecipe = useMemo(() => {
+    return compileBundleRecipe(bundleItems);
+  }, [bundleItems, menuItems]);
+
+  const handleAddBundleItem = () => {
+    if (bundleAvailableDishes.length === 0) return;
+    const firstUnused = bundleAvailableDishes.find(
+      (d) => !bundleItems.some((b) => b.dishId === d.id)
+    ) || bundleAvailableDishes[0];
+    setBundleItems((prev) => [...prev, { dishId: firstUnused.id, qty: 1 }]);
+  };
+
+  const handleUpdateBundleItem = (index: number, dishId: number, qty: number) => {
+    setBundleItems((prev) => {
+      const next = [...prev];
+      next[index] = { dishId, qty };
+      return next;
+    });
+  };
+
+  const handleRemoveBundleItem = (index: number) => {
+    setBundleItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSelectCategory = (cat: string) => {
+    setFoodCategory(cat);
+    const isB = cat.toLowerCase().includes('bundle') || cat.toLowerCase().includes('promo');
+    if (isB) {
+      if (foodImage.includes('/Ramen/') || foodImage.includes('/Rice Meals/') || foodImage.includes('/Drinks/')) {
+        setFoodImage('/images/Bundle/RamenDuo.png');
+      }
+      if (foodSize === 'Regular') {
+        setFoodSize('Bundle Set');
+      }
+      if (foodUom === 'serving') {
+        setFoodUom('set');
+      }
+      if (bundleItems.length === 0 && bundleAvailableDishes.length > 0) {
+        const ramen = bundleAvailableDishes.find((d) => d.category === 'Ramen') || bundleAvailableDishes[0];
+        const drinkOrRice = bundleAvailableDishes.find((d) => d.id !== ramen.id && (d.category === 'Drinks' || d.category === 'Rice Meals')) || bundleAvailableDishes[1];
+        const initialItems = [{ dishId: ramen.id, qty: 1 }];
+        if (drinkOrRice) initialItems.push({ dishId: drinkOrRice.id, qty: 1 });
+        setBundleItems(initialItems);
+        const sumVal = initialItems.reduce((s, it) => {
+          const d = menuItems.find((m) => m.id === it.dishId);
+          return s + (d ? Number(d.price) : 0);
+        }, 0);
+        setFoodPrice(String(Math.round(sumVal * 0.85)));
+      }
+    }
+  };
 
   // Visual Image Gallery Selector Modal
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -307,6 +411,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     setFoodSize('Regular');
     setFoodUom('serving');
     setFoodImage('/images/Ramen/Kuro.png');
+    setBundleItems([]);
     if (rawProducts.length > 0) {
       setFoodRecipe([
         {
@@ -332,7 +437,20 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
     setFoodSize(item.size || 'Regular');
     setFoodUom(item.uom || 'serving');
     setFoodImage(item.image || '/images/icons/NoPicture.png');
-    setFoodRecipe(Array.isArray(item.recipe) ? [...item.recipe] : []);
+
+    const isB = item.category.toLowerCase().includes('bundle') || item.category.toLowerCase().includes('promo');
+    if (isB) {
+      const meta = Array.isArray(item.recipe) ? item.recipe.find((r: any) => r.isBundleMeta) : null;
+      if (meta && (meta as any)._bundleItems && Array.isArray((meta as any)._bundleItems)) {
+        setBundleItems((meta as any)._bundleItems);
+      } else {
+        setBundleItems([]);
+      }
+      setFoodRecipe(Array.isArray(item.recipe) ? [...item.recipe.filter((r: any) => !r.isBundleMeta)] : []);
+    } else {
+      setBundleItems([]);
+      setFoodRecipe(Array.isArray(item.recipe) ? [...item.recipe] : []);
+    }
     setIsFoodModalOpen(true);
   };
 
@@ -392,7 +510,39 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
 
     const priceNum = parseFloat(foodPrice) || 0;
     const stockNum = parseInt(foodStock, 10) || 0;
-    const validRecipe = foodRecipe.filter((r) => r.productId && r.qty > 0);
+
+    let finalRecipe: RecipeIngredient[] = [];
+    if (isBundleCategory) {
+      if (bundleItems.length === 0) {
+        alert('Please add at least 1 meal or drink to this bundle promo.');
+        return;
+      }
+      const compiled = compileBundleRecipe(bundleItems);
+      finalRecipe = [
+        ...compiled,
+        {
+          productId: 0,
+          productName: '__bundle_meta__',
+          qty: 0,
+          uom: 'meta',
+          isBundleMeta: true,
+          _bundleItems: bundleItems
+        } as any
+      ];
+    } else {
+      finalRecipe = foodRecipe.filter((r) => r.productId && r.qty > 0);
+    }
+
+    let sizeDesc = foodSize.trim() || 'Regular';
+    if (isBundleCategory && (sizeDesc === 'Regular' || sizeDesc === 'Bundle Set' || !sizeDesc)) {
+      const parts = bundleItems.map((b) => {
+        const d = menuItems.find((m) => m.id === b.dishId);
+        return d ? `${b.qty}x ${d.name}` : '';
+      }).filter(Boolean);
+      if (parts.length > 0) {
+        sizeDesc = parts.join(' + ');
+      }
+    }
 
     if (editingMenuItem && onUpdateMenuItem) {
       await onUpdateMenuItem({
@@ -401,10 +551,10 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         category: foodCategory.trim(),
         price: priceNum,
         stock: stockNum,
-        size: foodSize.trim() || 'Regular',
-        uom: foodUom.trim() || 'serving',
+        size: sizeDesc,
+        uom: foodUom.trim() || (isBundleCategory ? 'set' : 'serving'),
         image: foodImage.trim() || '/images/icons/NoPicture.png',
-        recipe: validRecipe
+        recipe: finalRecipe
       });
     } else if (onCreateMenuItem) {
       await onCreateMenuItem({
@@ -412,12 +562,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
         category: foodCategory.trim(),
         price: priceNum,
         stock: stockNum,
-        size: foodSize.trim() || 'Regular',
-        uom: foodUom.trim() || 'serving',
+        size: sizeDesc,
+        uom: foodUom.trim() || (isBundleCategory ? 'set' : 'serving'),
         image: foodImage.trim() || '/images/icons/NoPicture.png',
         isBestSeller: 0,
         status: 'Active',
-        recipe: validRecipe
+        recipe: finalRecipe
       });
     }
 
@@ -649,7 +799,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                   </tr>
                 ) : (
                   filteredMenuItems.map((dish) => {
-                    const recipeList = Array.isArray(dish.recipe) ? dish.recipe : [];
+                    const recipeList = Array.isArray(dish.recipe) ? dish.recipe.filter((r: any) => !r.isBundleMeta && r.productId > 0) : [];
                     const cookable = calculateCookablePortions(dish);
                     const isOutOfIngredients = recipeList.length > 0 && cookable === 0 && dish.stock === 0;
 
@@ -987,13 +1137,37 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-300 block mb-1">Category *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-gray-300">Category *</label>
+                    <span className="text-[10px] text-gray-400">Quick select preset:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                    {['Ramen', 'Rice Meals', 'Drinks', 'Bundle'].map((cat) => {
+                      const isSel = foodCategory.toLowerCase() === cat.toLowerCase();
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => handleSelectCategory(cat)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            isSel
+                              ? cat === 'Bundle'
+                                ? 'bg-[#fed428] text-black border-[#fed428] shadow-sm'
+                                : 'bg-[#0ca1e1] text-black border-[#0ca1e1] shadow-sm'
+                              : 'bg-[#0c0e11] text-gray-400 border-[#212833] hover:text-white'
+                          }`}
+                        >
+                          {cat === 'Bundle' ? '🍱 Bundle / Promo' : cat}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <input
                     type="text"
                     required
                     value={foodCategory}
-                    onChange={(e) => setFoodCategory(e.target.value)}
-                    placeholder="e.g. Ramen, Rice Meals, Drinks"
+                    onChange={(e) => handleSelectCategory(e.target.value)}
+                    placeholder="e.g. Ramen, Rice Meals, Drinks, Bundle"
                     className="w-full bg-[#0c0e11] border border-[#212833] focus:border-[#0ca1e1] rounded-xl px-3 py-2 text-white text-xs outline-none"
                   />
                 </div>
@@ -1099,105 +1273,329 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({
                 </div>
               </div>
 
-              {/* RECIPE BUILDER / BILL OF MATERIALS */}
-              <div className="pt-3 border-t border-[#212833]">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#0ca1e1]" />
-                      <span>Recipe Ingredients (Bill of Materials)</span>
-                    </h4>
-                    <p className="text-[11px] text-gray-400">
-                      Raw ingredients consumed per 1 portion. Automatically deducted on order sale & batch cooking.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleOpenCreateIngredientModal}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#fed428]/15 hover:bg-[#fed428]/25 text-[#fed428] border border-[#fed428]/30 text-[11px] font-bold cursor-pointer transition-all"
-                      title="Add a new ingredient to inventory"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>New Ingredient</span>
-                    </button>
+              {/* RECIPE BUILDER / BUNDLE COMPONENTS BUILDER */}
+              {isBundleCategory ? (
+                /* BUNDLE / PROMO MEAL CHOICES BUILDER */
+                <div className="pt-3 border-t border-[#212833] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#fed428]" />
+                        <span>Bundle / Promo Included Meals & Drinks</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        Choose existing Ramens, Rice Meals, and Drinks. Raw ingredients are auto-compiled for kitchen cooking & order deductions.
+                      </p>
+                    </div>
 
                     <button
                       type="button"
-                      onClick={handleAddRecipeIngredient}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0ca1e1]/20 hover:bg-[#0ca1e1]/30 text-[#0ca1e1] border border-[#0ca1e1]/40 text-[11px] font-bold cursor-pointer transition-all"
+                      onClick={handleAddBundleItem}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#fed428] hover:bg-[#fed428]/90 text-black font-black text-xs transition-all cursor-pointer shadow-md shadow-[#fed428]/20"
                     >
-                      <Plus className="w-3 h-3" />
-                      <span>Add Row</span>
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>Add Meal / Drink</span>
                     </button>
                   </div>
-                </div>
 
-                {foodRecipe.length === 0 ? (
-                  <div className="p-3.5 rounded-xl bg-[#0c0e11] border border-dashed border-[#212833] text-center text-gray-500 text-xs">
-                    No ingredients added yet. Click "+ Add Row" to link raw supplies.
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {foodRecipe.map((ing, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-[#0c0e11] border border-[#212833]"
+                  {bundleItems.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-[#0c0e11] border border-dashed border-[#2b3543] text-center">
+                      <p className="text-xs text-gray-400 font-bold mb-1">No meals or drinks added yet</p>
+                      <p className="text-[11px] text-gray-500 mb-3">
+                        Click the button below to include dishes in this bundle promo (e.g. 1 Ramen + 1 Rice Meal + 1 Drink)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleAddBundleItem}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#fed428]/15 hover:bg-[#fed428]/25 text-[#fed428] border border-[#fed428]/40 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        {/* Ingredient Selector */}
-                        <div className="flex-1">
-                          <select
-                            value={ing.productId}
-                            onChange={(e) => handleUpdateRecipeRow(idx, 'productId', e.target.value)}
-                            className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2.5 py-1.5 text-white text-xs outline-none"
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Select First Item</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {bundleItems.map((bItem, idx) => {
+                        const dish = menuItems.find((m) => m.id === bItem.dishId);
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-2xl bg-[#0c0e11] border border-[#212833] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:border-[#2b3543]"
                           >
-                            {rawProducts.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.brand}) - {p.quantity} {p.uom} on hand
-                              </option>
-                            ))}
-                          </select>
+                            {/* Dish Selector & Thumbnail */}
+                            <div className="flex items-center gap-2.5 flex-1 min-w-[200px]">
+                              {dish?.image && (
+                                <img
+                                  src={dish.image}
+                                  alt={dish.name}
+                                  className="w-10 h-10 rounded-xl object-contain bg-[#151a21] p-1 border border-[#212833] shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/images/icons/NoPicture.png';
+                                  }}
+                                />
+                              )}
+                              <div className="flex-1">
+                                <select
+                                  value={bItem.dishId}
+                                  onChange={(e) => handleUpdateBundleItem(idx, Number(e.target.value), bItem.qty)}
+                                  className="w-full bg-[#151a21] border border-[#2b3543] focus:border-[#fed428] rounded-xl px-2.5 py-2 text-white font-bold text-xs outline-none"
+                                >
+                                  {bundleAvailableDishes.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      [{d.category}] {d.name} — ₱{Number(d.price).toFixed(2)}
+                                    </option>
+                                  ))}
+                                </select>
+                                {dish && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[10px] text-gray-400">
+                                      Category: <strong className="text-gray-300">{dish.category}</strong>
+                                    </span>
+                                    <span className="text-[10px] text-gray-500">•</span>
+                                    <span className="text-[10px] text-gray-400">
+                                      Regular: <strong className="text-[#fed428]">₱{Number(dish.price).toFixed(2)}</strong>
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Quantity Stepper & Price Calculation */}
+                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                              {/* Stepper */}
+                              <div className="flex items-center gap-1.5 bg-[#151a21] border border-[#2b3543] rounded-xl p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBundleItem(idx, bItem.dishId, Math.max(1, bItem.qty - 1))}
+                                  className="w-6 h-6 rounded-lg bg-[#0c0e11] hover:bg-[#202733] text-gray-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95"
+                                >
+                                  -
+                                </button>
+                                <span className="w-8 text-center text-white font-mono font-bold text-xs">
+                                  {bItem.qty}x
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBundleItem(idx, bItem.dishId, bItem.qty + 1)}
+                                  className="w-6 h-6 rounded-lg bg-[#0c0e11] hover:bg-[#202733] text-gray-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer active:scale-95"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              {/* Subtotal */}
+                              <div className="text-right min-w-[70px]">
+                                <div className="text-xs font-mono font-bold text-[#fed428]">
+                                  ₱{((dish?.price || 0) * bItem.qty).toFixed(2)}
+                                </div>
+                                <div className="text-[9px] text-gray-500 font-mono">
+                                  {bItem.qty > 1 ? `(${bItem.qty} × ₱${dish?.price})` : 'solo'}
+                                </div>
+                              </div>
+
+                              {/* Remove */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBundleItem(idx)}
+                                className="p-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 transition-all cursor-pointer"
+                                title="Remove item from bundle"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Promo Pricing Summary Card */}
+                  {bundleItems.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-[#151a21] border border-[#2b3543] space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Regular Total Value</span>
+                            <span className="text-sm font-bold text-gray-300 font-mono">₱{bundleRegularTotal.toFixed(2)}</span>
+                          </div>
+                          <span className="text-gray-600 font-bold text-lg">→</span>
+                          <div>
+                            <span className="text-[10px] text-[#fed428] uppercase tracking-wider block">Bundle Promo Price</span>
+                            <span className="text-base font-black text-[#fed428] font-mono">₱{Number(foodPrice || 0).toFixed(2)}</span>
+                          </div>
                         </div>
 
-                        {/* Amount per portion */}
-                        <div className="w-24">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0.01"
-                            value={ing.qty}
-                            onChange={(e) => handleUpdateRecipeRow(idx, 'qty', e.target.value)}
-                            placeholder="Qty"
-                            className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2 py-1.5 text-white font-mono font-bold text-xs outline-none text-right"
-                          />
-                        </div>
+                        {bundleRegularTotal > Number(foodPrice || 0) && (
+                          <div className="px-2.5 py-1 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 font-bold text-xs flex items-center gap-1.5">
+                            <Tag className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>
+                              Save ₱{(bundleRegularTotal - Number(foodPrice)).toFixed(2)} ({Math.round(((bundleRegularTotal - Number(foodPrice)) / bundleRegularTotal) * 100)}% OFF)
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Unit of measure */}
-                        <div className="w-16">
-                          <input
-                            type="text"
-                            value={ing.uom}
-                            onChange={(e) => handleUpdateRecipeRow(idx, 'uom', e.target.value)}
-                            placeholder="uom"
-                            className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2 py-1.5 text-gray-300 font-mono text-xs outline-none text-center"
-                          />
-                        </div>
-
-                        {/* Remove Ingredient Button */}
+                      {/* Quick Promo Preset Buttons */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-[#212833]">
+                        <span className="text-[10px] text-gray-400 font-bold">Quick Promo Price:</span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveRecipeRow(idx)}
-                          className="p-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 transition-all cursor-pointer"
-                          title="Remove row"
+                          onClick={() => setFoodPrice(String(bundleRegularTotal))}
+                          className="px-2 py-0.5 rounded-lg bg-[#0c0e11] hover:bg-[#202733] border border-[#2b3543] text-gray-300 text-[10px] font-bold cursor-pointer transition-all"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          Regular (₱{bundleRegularTotal})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFoodPrice(String(Math.round(bundleRegularTotal * 0.9)))}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold cursor-pointer transition-all"
+                        >
+                          10% OFF (₱{Math.round(bundleRegularTotal * 0.9)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFoodPrice(String(Math.round(bundleRegularTotal * 0.85)))}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold cursor-pointer transition-all"
+                        >
+                          15% OFF (₱{Math.round(bundleRegularTotal * 0.85)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFoodPrice(String(Math.round(bundleRegularTotal * 0.8)))}
+                          className="px-2 py-0.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/50 text-emerald-300 text-[10px] font-bold cursor-pointer transition-all"
+                        >
+                          20% OFF (₱{Math.round(bundleRegularTotal * 0.8)})
                         </button>
                       </div>
-                    ))}
+
+                      {/* Auto-compiled Raw Ingredients Preview */}
+                      <div className="pt-2 border-t border-[#212833]">
+                        <div className="text-[11px] font-bold text-gray-400 flex items-center gap-1.5 mb-1.5">
+                          <Layers className="w-3.5 h-3.5 text-[#0ca1e1]" />
+                          <span>Auto-Linked Raw Ingredients ({compiledBundleRecipe.length} items to deduct)</span>
+                        </div>
+                        {compiledBundleRecipe.length === 0 ? (
+                          <span className="text-[10px] text-gray-500 italic">
+                            None of the chosen items have linked raw recipes (pre-packed portions only).
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {compiledBundleRecipe.map((ing, i) => (
+                              <span
+                                key={i}
+                                className="px-2 py-0.5 rounded-lg bg-[#0c0e11] border border-[#212833] text-[10px] font-mono text-gray-300 flex items-center gap-1"
+                              >
+                                <span>{ing.productName}:</span>
+                                <strong className="text-[#0ca1e1]">{ing.qty} {ing.uom}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* RAW INGREDIENTS RECIPE BUILDER */
+                <div className="pt-3 border-t border-[#212833]">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#0ca1e1]" />
+                        <span>Recipe Ingredients (Bill of Materials)</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-400">
+                        Raw ingredients consumed per 1 portion. Automatically deducted on order sale & batch cooking.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenCreateIngredientModal}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#fed428]/15 hover:bg-[#fed428]/25 text-[#fed428] border border-[#fed428]/30 text-[11px] font-bold cursor-pointer transition-all"
+                        title="Add a new ingredient to inventory"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>New Ingredient</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleAddRecipeIngredient}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0ca1e1]/20 hover:bg-[#0ca1e1]/30 text-[#0ca1e1] border border-[#0ca1e1]/40 text-[11px] font-bold cursor-pointer transition-all"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Row</span>
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {foodRecipe.length === 0 ? (
+                    <div className="p-3.5 rounded-xl bg-[#0c0e11] border border-dashed border-[#212833] text-center text-gray-500 text-xs">
+                      No ingredients added yet. Click "+ Add Row" to link raw supplies.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {foodRecipe.map((ing, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 p-2 rounded-xl bg-[#0c0e11] border border-[#212833]"
+                        >
+                          {/* Ingredient Selector */}
+                          <div className="flex-1">
+                            <select
+                              value={ing.productId}
+                              onChange={(e) => handleUpdateRecipeRow(idx, 'productId', e.target.value)}
+                              className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2.5 py-1.5 text-white text-xs outline-none"
+                            >
+                              {rawProducts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.brand}) - {p.quantity} {p.uom} on hand
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Amount per portion */}
+                          <div className="w-24">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0.01"
+                              value={ing.qty}
+                              onChange={(e) => handleUpdateRecipeRow(idx, 'qty', e.target.value)}
+                              placeholder="Qty"
+                              className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2 py-1.5 text-white font-mono font-bold text-xs outline-none text-right"
+                            />
+                          </div>
+
+                          {/* Unit of measure */}
+                          <div className="w-16">
+                            <input
+                              type="text"
+                              value={ing.uom}
+                              onChange={(e) => handleUpdateRecipeRow(idx, 'uom', e.target.value)}
+                              placeholder="uom"
+                              className="w-full bg-[#151a21] border border-[#2b3543] rounded-lg px-2 py-1.5 text-gray-300 font-mono text-xs outline-none text-center"
+                            />
+                          </div>
+
+                          {/* Remove Ingredient Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRecipeRow(idx)}
+                            className="p-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 transition-all cursor-pointer"
+                            title="Remove row"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#212833]">
