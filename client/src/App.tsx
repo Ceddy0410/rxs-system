@@ -783,24 +783,13 @@ export const App: React.FC = () => {
   // TV Screen Mode (Dedicated Full Screen Kitchen Display)
   if (tvMode) {
     return (
-      <div className="h-screen w-screen bg-[#080a0d] text-white flex flex-col overflow-hidden relative font-sans">
-        <div className="absolute top-4 right-6 z-50 flex items-center gap-3">
-          <span className="text-xs px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold flex items-center gap-1.5 animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            KITCHEN TV SCREEN • ACTIVE
-          </span>
-          <button
-            onClick={() => setTvMode(false)}
-            className="px-3.5 py-1.5 rounded-xl bg-[#151a21] hover:bg-[#202733] border border-[#2b3543] text-gray-300 hover:text-white text-xs font-bold transition-all shadow-lg active:scale-95"
-          >
-            Exit TV Mode
-          </button>
-        </div>
-
+      <div className="h-screen w-screen bg-[#080a0d] text-white flex flex-col overflow-hidden font-sans">
         <KitchenDisplay
           orders={orders}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onPlayChime={playKitchenChime}
+          isTvMode={true}
+          onToggleTvMode={() => setTvMode(false)}
         />
       </div>
     );
@@ -864,6 +853,8 @@ export const App: React.FC = () => {
               orders={orders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
               onPlayChime={playKitchenChime}
+              isTvMode={false}
+              onToggleTvMode={() => setTvMode(true)}
             />
           )}
 

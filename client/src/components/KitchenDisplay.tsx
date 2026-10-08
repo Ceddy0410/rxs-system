@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { UtensilsCrossed, Clock, CheckCircle, ChefHat, Volume2, AlertTriangle, Flame } from 'lucide-react';
+import { UtensilsCrossed, Clock, CheckCircle, ChefHat, Volume2, AlertTriangle, Flame, Tv } from 'lucide-react';
 import type { Order } from '../types';
 
 interface KitchenDisplayProps {
   orders: Order[];
   onUpdateOrderStatus: (orderId: number, status: 'Preparing' | 'Ready' | 'Completed') => void;
   onPlayChime?: () => void;
+  isTvMode?: boolean;
+  onToggleTvMode?: () => void;
 }
 
 export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({ 
   orders, 
   onUpdateOrderStatus,
-  onPlayChime 
+  onPlayChime,
+  isTvMode = false,
+  onToggleTvMode
 }) => {
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Preparing' | 'Ready'>('All');
   const [now, setNow] = useState<number>(Date.now());
@@ -86,21 +90,28 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#080a0d] p-5 overflow-hidden select-none">
-      {/* KDS Header */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#212833]">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10">
+      {/* KDS Header - Clean Responsive Flex Layout with No Overlaps */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#212833]">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10 shrink-0">
             <ChefHat className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <h2 className="text-xl font-black text-white tracking-wide">
                 Kitchen Display System (KDS)
               </h2>
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold flex items-center gap-1.5 animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                MONITOR 2 • LIVE TV FEED
-              </span>
+              {isTvMode ? (
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold flex items-center gap-1.5 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  TV SCREEN ACTIVE
+                </span>
+              ) : (
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 font-mono font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                  LIVE KITCHEN FEED
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
               Instant real-time ticket stream from Cashier terminals
@@ -108,12 +119,29 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
           </div>
         </div>
 
-        {/* Filter Pills & Actions */}
-        <div className="flex items-center gap-2">
+        {/* Filter Pills & Actions (All in single row, no floating overlaps) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onToggleTvMode && (
+            <button
+              type="button"
+              onClick={onToggleTvMode}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer ${
+                isTvMode
+                  ? 'bg-[#151a21] hover:bg-rose-950/50 border-[#2b3543] hover:border-rose-700/60 text-gray-300 hover:text-rose-300'
+                  : 'bg-[#151a21] hover:bg-[#202733] border-[#2b3543] text-gray-300 hover:text-white'
+              }`}
+              title={isTvMode ? 'Exit Fullscreen TV Mode' : 'Switch to Dedicated TV Screen View'}
+            >
+              <Tv className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isTvMode ? 'Exit TV Mode' : 'TV Screen View'}</span>
+            </button>
+          )}
+
           {onPlayChime && (
             <button
+              type="button"
               onClick={onPlayChime}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] hover:bg-[#202733] border border-[#2b3543] text-gray-300 hover:text-white text-xs font-bold transition-all shadow-md"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#151a21] hover:bg-[#202733] border border-[#2b3543] text-gray-300 hover:text-white text-xs font-bold transition-all shadow-md cursor-pointer active:scale-95"
               title="Test Kitchen Audio Bell"
             >
               <Volume2 className="w-3.5 h-3.5 text-amber-400" />
@@ -125,8 +153,9 @@ export const KitchenDisplay: React.FC<KitchenDisplayProps> = ({
             {(['All', 'Pending', 'Preparing', 'Ready'] as const).map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => setFilter(tab)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   filter === tab
                     ? 'bg-[#fed428] text-black shadow-md'
                     : 'text-gray-400 hover:text-white'
